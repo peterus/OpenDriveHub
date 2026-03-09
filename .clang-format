@@ -1,0 +1,64 @@
+# OpenDriveHub clang-format configuration
+#
+# Style: LLVM base with 4-space indentation and 500-column line limit.
+# Run:   clang-format -i --style=file <file>
+# Check: clang-format --dry-run --Werror --style=file <file>
+
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 500
+UseTab: Never
+
+# Brace style – keep opening braces on same line (K&R derivative)
+BreakBeforeBraces: Attach
+
+# Pointer/reference alignment
+PointerAlignment: Right
+
+# Include sorting
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  # Arduino / ESP-IDF system headers first
+  - Regex: "^<(Arduino|Wire|WiFi|esp_now|esp_mac|Preferences|WebServer)(\\.h)?>$"
+    Priority: 1
+  # Third-party library headers
+  - Regex: "^<Adafruit_.*>$"
+    Priority: 2
+  # Project headers
+  - Regex: "^\".*\"$"
+    Priority: 3
+
+# Access modifier indentation
+AccessModifierOffset: -4
+IndentAccessModifiers: false
+
+# Constructor initialiser lists
+BreakConstructorInitializers: BeforeColon
+ConstructorInitializerIndentWidth: 4
+PackConstructorInitializers: Never
+
+# Trailing commas
+InsertTrailingCommas: None
+
+# Alignment
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossComments: false
+  AcrossEmptyLines: false
+AlignConsecutiveDeclarations:
+  Enabled: false
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 1
+
+# Short functions / loops
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+
+# Misc
+SpaceBeforeParens: ControlStatements
+Cpp11BracedListStyle: true
+Standard: c++20

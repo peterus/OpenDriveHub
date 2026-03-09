@@ -1,0 +1,16 @@
+# PlatformIO build artifacts
+.pio/
+.pioenvs/
+.clangd/
+.cache/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# KiCad / EDA build outputs
+*.bak
+*.000
+fp-info-cache

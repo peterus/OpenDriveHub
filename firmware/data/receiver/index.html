@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OpenDriveHub Receiver</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    body {
+      font-family: -apple-system, sans-serif;
+      max-width: 520px;
+      margin: 2em auto;
+      padding: 0 1em;
+      background: #0d1117;
+      color: #e6edf3
+    }
+
+    h1 {
+      font-size: 1.3em;
+      color: #1f6feb;
+      margin-bottom: .8em
+    }
+
+    h2 {
+      font-size: 1em;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin: 1.4em 0 .4em
+    }
+
+    .status {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: .7em 1em;
+      font-size: .85em;
+      margin-bottom: 1em;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .3em .8em
+    }
+
+    .status span {
+      color: #8b949e
+    }
+
+    .status strong {
+      color: #e6edf3
+    }
+
+    label {
+      display: block;
+      margin: .5em 0 .15em;
+      font-size: .9em;
+      color: #8b949e
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: .45em .6em;
+      background: #161b22;
+      color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      font-size: .95em
+    }
+
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: #1f6feb
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: .4em
+    }
+
+    th {
+      text-align: left;
+      font-size: .85em;
+      color: #8b949e;
+      font-weight: normal;
+      padding: .3em .4em;
+      border-bottom: 1px solid #21262d
+    }
+
+    td {
+      padding: .3em .4em
+    }
+
+    td select {
+      width: auto;
+      min-width: 8em
+    }
+
+    .btn {
+      margin-top: 1.2em;
+      padding: .55em 1.4em;
+      background: #1f6feb;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: .95em
+    }
+
+    .btn:hover {
+      background: #388bfd
+    }
+
+    .btn-danger {
+      background: #f85149
+    }
+
+    .btn-danger:hover {
+      background: #da3633
+    }
+
+    .saved {
+      background: #1f4c2e;
+      border: 1px solid #3fb950;
+      color: #3fb950;
+      border-radius: 4px;
+      padding: .5em .8em;
+      margin-bottom: 1em;
+      font-size: .9em;
+      display: none
+    }
+
+    .ch-bar {
+      height: 14px;
+      background: #21262d;
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 2px 0
+    }
+
+    .ch-fill {
+      height: 100%;
+      background: #1f6feb;
+      border-radius: 3px;
+      transition: width .15s
+    }
+  </style>
+</head>
+
+<body>
+  <h1>&#x1F4E1; OpenDriveHub Receiver</h1>
+  <div id="msg" class="saved"></div>
+
+  <div id="status" class="status">
+    <span>Link</span><strong id="s-link">---</strong>
+    <span>Battery</span><strong id="s-batt">---</strong>
+    <span>RSSI</span><strong id="s-rssi">---</strong>
+    <span>Channels</span><strong id="s-ch">---</strong>
+  </div>
+
+  <h2>Configuration</h2>
+  <div id="config-form">
+    <label>Vehicle Name</label>
+    <input type="text" id="c-name" maxlength="28">
+
+    <label>Model Type</label>
+    <select id="c-model"></select>
+
+    <h2>Function Map</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Channel</th>
+          <th>Function</th>
+        </tr>
+      </thead>
+      <tbody id="fmap-body"></tbody>
+    </table>
+
+    <label>Failsafe (µs, 0 = hold last)</label>
+    <input type="number" id="c-failsafe" min="0" max="2500" value="0">
+
+    <button class="btn" onclick="saveConfig()">Save Settings</button>
+    <button class="btn btn-danger" style="margin-left:.5em" onclick="resetConfig()">Factory Reset</button>
+  </div>
+
+  <h2>Live Channels</h2>
+  <div id="channels"></div>
+
+  <script>
+    const API = '';  // same origin
+
+    async function fetchJson(url) {
+      const r = await fetch(API + url);
+      return r.json();
+    }
+
+    async function postJson(url, body) {
+      return fetch(API + url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+    }
+
+    function showMsg(text) {
+      const m = document.getElementById('msg');
+      m.textContent = text;
+      m.style.display = 'block';
+      setTimeout(() => m.style.display = 'none', 3000);
+    }
+
+    let availableModels = [];
+    let availableFunctions = [];
+
+    async function loadStatus() {
+      try {
+        const s = await fetchJson('/api/status');
+        document.getElementById('s-link').textContent = s.link?.state || '---';
+        document.getElementById('s-batt').textContent =
+          s.battery?.voltage_mv ? (s.battery.voltage_mv / 1000).toFixed(1) + ' V' : '---';
+        document.getElementById('s-rssi').textContent =
+          s.link?.rssi != null ? s.link.rssi + ' dBm' : '---';
+
+        // Live channels
+        const chDiv = document.getElementById('channels');
+        if (s.channels && s.channels.length) {
+          document.getElementById('s-ch').textContent = s.channels.length;
+          let html = '';
+          s.channels.forEach((ch, i) => {
+            const pct = Math.round((ch.value - 1000) / 10);
+            html += `<div style="display:flex;align-items:center;gap:6px;margin:3px 0">
+          <span style="width:24px;color:#8b949e;font-size:.85em">${i}</span>
+          <span style="width:60px;font-size:.85em;color:#8b949e">${ch.function_name || ''}</span>
+          <div class="ch-bar" style="flex:1"><div class="ch-fill" style="width:${pct}%"></div></div>
+          <span style="width:40px;text-align:right;font-size:.85em">${ch.value}</span>
+        </div>`;
+          });
+          chDiv.innerHTML = html;
+        } else {
+          document.getElementById('s-ch').textContent = '0';
+          chDiv.innerHTML = '<span style="color:#8b949e">No active channels</span>';
+        }
+      } catch (e) { console.error('Status fetch failed', e); }
+    }
+
+    async function loadConfig() {
+      try {
+        const c = await fetchJson('/api/config');
+        document.getElementById('c-name').value = c.vehicle_name || '';
+        document.getElementById('c-failsafe').value = c.failsafe_us || 0;
+
+        availableModels = c.available_models || [];
+        const sel = document.getElementById('c-model');
+        sel.innerHTML = '';
+        availableModels.forEach(m => {
+          const o = document.createElement('option');
+          o.value = m.id; o.textContent = m.name;
+          if (m.id === c.model_type) o.selected = true;
+          sel.appendChild(o);
+        });
+
+        // Function map
+        const tbody = document.getElementById('fmap-body');
+        tbody.innerHTML = '';
+        if (c.function_map) {
+          availableFunctions = c.available_functions || [];
+          c.function_map.forEach((entry, i) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${i}</td><td><select id="fm-${i}">
+          ${availableFunctions.map(f =>
+              `<option value="${f.id}" ${f.id === entry.function ? 'selected' : ''}>${f.name}</option>`
+            ).join('')}
+        </select></td>`;
+            tbody.appendChild(tr);
+          });
+        }
+      } catch (e) { console.error('Config fetch failed', e); }
+    }
+
+    async function saveConfig() {
+      const fmap = [];
+      document.querySelectorAll('[id^="fm-"]').forEach(sel => {
+        fmap.push({ function: parseInt(sel.value) });
+      });
+
+      const body = {
+        vehicle_name: document.getElementById('c-name').value,
+        model_type: parseInt(document.getElementById('c-model').value),
+        failsafe_us: parseInt(document.getElementById('c-failsafe').value),
+        function_map: fmap
+      };
+
+      const r = await postJson('/api/config', body);
+      if (r.ok) showMsg('Settings saved');
+      else showMsg('Save failed');
+    }
+
+    async function resetConfig() {
+      if (!confirm('Reset all settings to factory defaults?')) return;
+      const r = await postJson('/api/config/reset', {});
+      if (r.ok) { showMsg('Reset complete – rebooting...'); setTimeout(() => location.reload(), 3000); }
+    }
+
+    // Initial load + periodic status refresh
+    loadConfig();
+    loadStatus();
+    setInterval(loadStatus, 2000);
+  </script>
+</body>
+
+</html>

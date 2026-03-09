@@ -1,0 +1,211 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+# Minimal permissions: jobs only need to check out the repository.
+permissions:
+  contents: read
+
+jobs:
+  # ── Native unit tests (no hardware required) ───────────────────────────
+  native-tests:
+    name: Native unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-native-${{ hashFiles('firmware/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-native-
+
+      - name: Run native unit tests
+        working-directory: firmware
+        run: pio test -e native
+
+  # ── Transmitter firmware compile-check (catches build regressions) ─────
+  build-transmitter:
+    name: Build transmitter firmware
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-esp32-${{ hashFiles('firmware/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-esp32-
+
+      - name: Build transmitter firmware
+        working-directory: firmware
+        run: pio run -e transmitter
+
+  # ── Receiver firmware compile-check ───────────────────────────────────
+  build-receiver:
+    name: Build receiver firmware
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-esp32-${{ hashFiles('firmware/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-esp32-
+
+      - name: Build receiver firmware
+        working-directory: firmware
+        run: pio run -e receiver
+
+  # ── Receiver simulation build ──────────────────────────────────────────
+  build-sim-rx:
+    name: Build receiver simulation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-sim-${{ hashFiles('firmware/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-sim-
+
+      - name: Build receiver simulation
+        working-directory: firmware
+        run: pio run -e sim_rx
+
+  # ── Transmitter simulation build ───────────────────────────────────────
+  build-sim-tx:
+    name: Build transmitter simulation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libsdl2-dev
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-sim-${{ hashFiles('firmware/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-sim-
+
+      - name: Build transmitter simulation
+        working-directory: firmware
+        run: pio run -e sim_tx
+
+  # ── clang-format style check ───────────────────────────────────────────
+  clang-format:
+    name: clang-format check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          wget -qO - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          echo "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-19 main" | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y clang-format-19
+          sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-19 100
+
+      - name: Check formatting
+        run: |
+          find firmware/src firmware/lib \
+            \( -name '*.cpp' -o -name '*.h' -o -name '*.c' \) \
+            ! -path '*/.*' \
+            -print0 \
+          | xargs -0 clang-format --dry-run --Werror --style=file
+
+  # ── cppcheck static analysis ───────────────────────────────────────────
+  cppcheck:
+    name: cppcheck static analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: sudo apt-get install -y cppcheck
+
+      - name: Run cppcheck
+        run: |
+          cppcheck \
+            --error-exitcode=1 \
+            --enable=warning,style,performance,portability \
+            --suppress=missingIncludeSystem \
+            --suppress=missingInclude \
+            --suppress=constParameterPointer \
+            --suppress=constParameterCallback \
+            --suppress=unmatchedSuppression \
+            --inline-suppr \
+            -I firmware/src/receiver \
+            -I firmware/src/transmitter \
+            -I firmware/lib/odh-protocol \
+            -I firmware/lib/odh-config \
+            -I firmware/lib/odh-radio \
+            -I firmware/lib/odh-telemetry \
+            -I firmware/lib/odh-web \
+            firmware/src \
+            firmware/lib
