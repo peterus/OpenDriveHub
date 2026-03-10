@@ -1,12 +1,32 @@
+/*
+ * Copyright (C) 2026 Peter Buchegger
+ *
+ * This file is part of OpenDriveHub.
+ *
+ * OpenDriveHub is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * OpenDriveHub is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with OpenDriveHub. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 /**
  * sim_freertos.cpp – FreeRTOS API implementation using pthreads.
  */
 
+#include "Arduino.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
-
-#include "Arduino.h"
 
 #include <chrono>
 #include <pthread.h>
@@ -44,10 +64,7 @@ static void *taskWrapper(void *arg) {
     return nullptr;
 }
 
-BaseType_t xTaskCreatePinnedToCore(TaskFunction_t fn, const char *,
-                                   uint32_t, void *param,
-                                   UBaseType_t, TaskHandle_t *handle,
-                                   BaseType_t) {
+BaseType_t xTaskCreatePinnedToCore(TaskFunction_t fn, const char *, uint32_t, void *param, UBaseType_t, TaskHandle_t *handle, BaseType_t) {
     auto *p  = new TaskParams{fn, param};
     auto *th = new pthread_t;
     int ret  = pthread_create(th, nullptr, taskWrapper, p);
@@ -70,7 +87,8 @@ SemaphoreHandle_t xSemaphoreCreateMutex() {
 }
 
 BaseType_t xSemaphoreTake(SemaphoreHandle_t sem, TickType_t timeout) {
-    if (!sem) return pdFALSE;
+    if (!sem)
+        return pdFALSE;
     auto *mtx = static_cast<pthread_mutex_t *>(sem);
 
     if (timeout == portMAX_DELAY) {
@@ -90,16 +108,19 @@ BaseType_t xSemaphoreTake(SemaphoreHandle_t sem, TickType_t timeout) {
 }
 
 BaseType_t xSemaphoreGive(SemaphoreHandle_t sem) {
-    if (!sem) return pdFALSE;
+    if (!sem)
+        return pdFALSE;
     return pthread_mutex_unlock(static_cast<pthread_mutex_t *>(sem)) == 0 ? pdTRUE : pdFALSE;
 }
 
 BaseType_t xSemaphoreTakeFromISR(SemaphoreHandle_t sem, BaseType_t *higherPrioWoken) {
-    if (higherPrioWoken) *higherPrioWoken = pdFALSE;
+    if (higherPrioWoken)
+        *higherPrioWoken = pdFALSE;
     return xSemaphoreTake(sem, 0);
 }
 
 BaseType_t xSemaphoreGiveFromISR(SemaphoreHandle_t sem, BaseType_t *higherPrioWoken) {
-    if (higherPrioWoken) *higherPrioWoken = pdFALSE;
+    if (higherPrioWoken)
+        *higherPrioWoken = pdFALSE;
     return xSemaphoreGive(sem);
 }

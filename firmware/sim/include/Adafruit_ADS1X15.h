@@ -1,3 +1,24 @@
+/*
+ * Copyright (C) 2026 Peter Buchegger
+ *
+ * This file is part of OpenDriveHub.
+ *
+ * OpenDriveHub is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * OpenDriveHub is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with OpenDriveHub. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 /**
  * Adafruit_ADS1X15.h – Simulation stub for ADS1115 ADC.
  *
@@ -33,11 +54,23 @@ typedef enum {
 
 class Adafruit_ADS1115 {
 public:
-    Adafruit_ADS1115(uint8_t addr = 0x48) { (void)addr; }
-    bool begin(uint8_t addr = 0x48) { (void)addr; return true; }
-    void setGain(adsGain_t g) { (void)g; }
-    void setDataRate(ads1115DataRate_t r) { (void)r; }
-    int16_t readADC_SingleEnded(uint8_t channel) { (void)channel; return 16384; }
+    Adafruit_ADS1115(uint8_t addr = 0x48) {
+        (void)addr;
+    }
+    bool begin(uint8_t addr = 0x48) {
+        (void)addr;
+        return true;
+    }
+    void setGain(adsGain_t g) {
+        (void)g;
+    }
+    void setDataRate(ads1115DataRate_t r) {
+        (void)r;
+    }
+    int16_t readADC_SingleEnded(uint8_t channel) {
+        (void)channel;
+        return 16384;
+    }
 };
 
 #endif /* SIM_ADAFRUIT_ADS1X15_H */
