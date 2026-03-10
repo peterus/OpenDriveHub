@@ -50,6 +50,7 @@ void ModuleManager::scanAndInit() {
 
         auto mod = detectModule(slot);
         if (mod && mod->begin()) {
+            mod->setReady();
             _modules[slot] = std::move(mod);
         }
         _backplane.deselectAll();
