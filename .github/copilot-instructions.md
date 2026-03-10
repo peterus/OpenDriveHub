@@ -106,8 +106,8 @@ Always run builds from the `firmware/` directory – `platformio.ini` is there.
 
 ### Static Analysis (cppcheck)
 - CI runs cppcheck with `--enable=warning,style,performance,portability`
-- Suppressed globally: `missingIncludeSystem`, `missingInclude`, `constParameterPointer`, `constParameterCallback`
-- Use `// cppcheck-suppress <id>` for inline suppressions when needed
+- Suppressed globally: `missingIncludeSystem`, `missingInclude`
+- Use `// cppcheck-suppress <id>` for inline suppressions when needed (e.g. `constParameterCallback` for ESP-IDF callbacks)
 
 ## Key Architecture Details
 
@@ -172,6 +172,57 @@ After ANY code change, verify at minimum:
 1. `pio test -e native` – all 90 tests pass
 2. `pio run -e receiver` – compiles
 3. `pio run -e transmitter` – compiles
+4. **clang-format** – all changed files must be formatted before committing
+5. **cppcheck** – no new warnings allowed
+
+### clang-format (mandatory)
+
+CI **rejects** any PR with formatting violations. Always run clang-format **19**
+on every touched `.cpp` / `.h` / `.c` file before committing:
+
+```bash
+# Format a single file
+clang-format -i --style=file firmware/src/receiver/web/ReceiverApi.cpp
+
+# Format all project sources
+find firmware/src firmware/lib \
+  \( -name '*.cpp' -o -name '*.h' -o -name '*.c' \) \
+  ! -path '*/.*' \
+  -exec clang-format -i --style=file {} +
+```
+
+The `.clang-format` file in the repo root defines the style. Do **not** override
+it with `--style=…` other than `--style=file`.
+
+### cppcheck (mandatory)
+
+CI **rejects** any PR that introduces new cppcheck warnings. Run locally:
+
+```bash
+cppcheck \
+  --error-exitcode=1 \
+  --enable=warning,style,performance,portability \
+  --suppress=missingIncludeSystem \
+  --suppress=missingInclude \
+  --suppress=unmatchedSuppression \
+  --check-level=exhaustive \
+  --inline-suppr \
+  -I firmware/src/receiver \
+  -I firmware/src/transmitter \
+  -I firmware/lib/odh-protocol \
+  -I firmware/lib/odh-config \
+  -I firmware/lib/odh-radio \
+  -I firmware/lib/odh-telemetry \
+  -I firmware/lib/odh-web \
+  firmware/src \
+  firmware/lib
+```
+
+If a warning is a false positive, suppress it inline:
+```cpp
+// cppcheck-suppress constParameterCallback
+void onData(uint8_t *mac, uint8_t *data, int len) { … }
+```
 
 ## Common Pitfalls
 

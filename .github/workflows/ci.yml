@@ -196,9 +196,8 @@ jobs:
             --enable=warning,style,performance,portability \
             --suppress=missingIncludeSystem \
             --suppress=missingInclude \
-            --suppress=constParameterPointer \
-            --suppress=constParameterCallback \
             --suppress=unmatchedSuppression \
+            --check-level=exhaustive \
             --inline-suppr \
             -I firmware/src/receiver \
             -I firmware/src/transmitter \

@@ -16,6 +16,7 @@ namespace odh {
 static volatile int8_t sPromiscRssi = 0;
 
 #ifndef NATIVE_SIM
+// cppcheck-suppress constParameterCallback
 static void promiscRxCb(void *buf, wifi_promiscuous_pkt_type_t /*type*/) {
     const auto *pkt = static_cast<const wifi_promiscuous_pkt_t *>(buf);
     sPromiscRssi    = pkt->rx_ctrl.rssi;
