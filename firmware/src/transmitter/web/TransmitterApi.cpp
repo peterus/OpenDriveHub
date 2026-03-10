@@ -24,6 +24,7 @@ void TransmitterApi::begin() {
 
     _server.on("/api/config", HTTP_GET, [this](AsyncWebServerRequest *r) { handleGetConfig(r); });
 
+    // cppcheck-suppress constParameterPointer
     _server.onBody("/api/config", HTTP_POST, [](AsyncWebServerRequest *) {}, [this](AsyncWebServerRequest *r, uint8_t *d, size_t l, size_t, size_t) { handlePostConfig(r, d, l); });
 
     _server.on("/api/config/reset", HTTP_POST, [this](AsyncWebServerRequest *r) { handlePostReset(r); });

@@ -15,7 +15,7 @@ namespace odh {
 
 inline constexpr uint8_t kPotI2cAddr = 0x48;
 inline constexpr uint8_t kPotCount   = 4;
-inline constexpr int16_t kPotAdcMax  = 32767;
+inline constexpr int32_t kPotAdcMax  = 32767;
 
 class PotModule : public IModule {
 public:
@@ -35,7 +35,7 @@ private:
     int16_t _raw[kPotCount]     = {};
     uint16_t _values[kPotCount] = {};
 
-    static uint16_t mapToChannel(int16_t raw);
+    static uint16_t mapToChannel(int32_t raw);
 };
 
 } // namespace odh

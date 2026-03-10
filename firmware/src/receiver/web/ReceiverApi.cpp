@@ -25,9 +25,10 @@ void ReceiverApi::begin() {
     // POST /api/config (JSON body)
     _server.onBody(
         "/api/config", HTTP_POST,
-        [](AsyncWebServerRequest *req) {
+        [](AsyncWebServerRequest *) {
             // Handler called after body is received – see body handler below.
         },
+        // cppcheck-suppress constParameterPointer
         [this](AsyncWebServerRequest *req, uint8_t *data, size_t len, size_t index, size_t total) { handlePostConfig(req, data, len, index, total); });
 
     // POST /api/config/reset
