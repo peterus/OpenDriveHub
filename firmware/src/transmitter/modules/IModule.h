@@ -66,6 +66,11 @@ public:
         return _ready;
     }
 
+    /// Mark the module as ready (called by ModuleManager after begin()).
+    void setReady() {
+        _ready = true;
+    }
+
     /// Slot index this module occupies (0-based).
     uint8_t slot() const {
         return _slot;
