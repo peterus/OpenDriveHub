@@ -200,6 +200,7 @@ The CI workflow (`.github/workflows/ci.yml`) runs on push/PR to main/master:
 | `build-sim-tx`     | `pio run -e sim_tx` (needs `libsdl2-dev`)   |
 | `clang-format`     | Formatting check (clang-format-19)          |
 | `cppcheck`         | Static analysis                             |
+| `license-headers`  | Copyright header check (SPDX identifier)    |
 
 After ANY code change, verify at minimum:
 1. `pio test -e native` – all 90 tests pass
@@ -207,6 +208,7 @@ After ANY code change, verify at minimum:
 3. `pio run -e transmitter` – compiles
 4. **clang-format** – all changed files must be formatted before committing
 5. **cppcheck** – no new warnings allowed
+6. **copyright header** – all new files must have the GPL-3.0 header
 
 ### clang-format (mandatory)
 

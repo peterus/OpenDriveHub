@@ -208,3 +208,43 @@ jobs:
             -I firmware/lib/odh-web \
             firmware/src \
             firmware/lib
+
+  # ── Copyright / license header check ───────────────────────────────────
+  license-headers:
+    name: Copyright header check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check copyright headers
+        run: |
+          missing=0
+          # C/C++ files: expect "SPDX-License-Identifier: GPL-3.0-or-later" in /* */ block
+          while IFS= read -r -d '' f; do
+            if ! head -25 "$f" | grep -q 'SPDX-License-Identifier: GPL-3.0-or-later'; then
+              echo "::error file=$f::Missing copyright header: $f"
+              missing=$((missing + 1))
+            fi
+          done < <(find firmware/src firmware/lib firmware/sim firmware/include firmware/test \
+                     \( -name '*.cpp' -o -name '*.h' -o -name '*.c' \) \
+                     ! -path '*/.pio/*' -print0)
+          # HTML files
+          while IFS= read -r -d '' f; do
+            if ! head -25 "$f" | grep -q 'SPDX-License-Identifier: GPL-3.0-or-later'; then
+              echo "::error file=$f::Missing copyright header: $f"
+              missing=$((missing + 1))
+            fi
+          done < <(find firmware/data -name '*.html' -print0)
+          # Python files
+          while IFS= read -r -d '' f; do
+            if ! head -25 "$f" | grep -q 'SPDX-License-Identifier: GPL-3.0-or-later'; then
+              echo "::error file=$f::Missing copyright header: $f"
+              missing=$((missing + 1))
+            fi
+          done < <(find firmware/sim -name '*.py' -print0)
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::$missing file(s) missing the GPL-3.0 copyright header."
+            exit 1
+          fi
+          echo "All files have correct copyright headers."
