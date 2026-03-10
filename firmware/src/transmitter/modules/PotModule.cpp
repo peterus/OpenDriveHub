@@ -37,7 +37,7 @@ int16_t PotModule::rawValue(uint8_t index) const {
     return _raw[index];
 }
 
-uint16_t PotModule::mapToChannel(int16_t raw) {
+uint16_t PotModule::mapToChannel(int32_t raw) {
     if (raw < 0)
         raw = 0;
     if (raw > kPotAdcMax)

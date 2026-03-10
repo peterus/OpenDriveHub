@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
+#include <algorithm>
 #include <cstring>
 
 namespace odh {
@@ -45,7 +46,7 @@ void TransmitterRadioLink::startScanning() {
     _bound           = false;
     _scanning        = true;
     _discoveredCount = 0;
-    std::memset(_discovered, 0, sizeof(_discovered));
+    std::fill(std::begin(_discovered), std::end(_discovered), DiscoveredVehicle{});
 }
 
 const DiscoveredVehicle *TransmitterRadioLink::discoveredVehicle(uint8_t index) const {
@@ -63,7 +64,7 @@ void TransmitterRadioLink::pruneStaleVehicles(uint32_t timeoutMs) {
                 _discovered[j] = _discovered[j + 1];
             }
             _discoveredCount--;
-            std::memset(&_discovered[_discoveredCount], 0, sizeof(DiscoveredVehicle));
+            _discovered[_discoveredCount] = DiscoveredVehicle{};
         } else {
             i++;
         }
