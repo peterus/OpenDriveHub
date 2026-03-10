@@ -1,3 +1,24 @@
+/*
+ * Copyright (C) 2026 Peter Buchegger
+ *
+ * This file is part of OpenDriveHub.
+ *
+ * OpenDriveHub is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * OpenDriveHub is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with OpenDriveHub. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 /**
  * sim_espnow.cpp – ESP-NOW over UDP sockets.
  *
@@ -7,8 +28,8 @@
  * sender's address.
  */
 
-#include "esp_now.h"
 #include "Arduino.h"
+#include "esp_now.h"
 
 #include <arpa/inet.h>
 #include <cstdio>
@@ -22,9 +43,9 @@
 
 /* ── Internal state ─────────────────────────────────────────────────────── */
 
-static int s_sock = -1;
-static esp_now_recv_cb_t s_recvCb  = nullptr;
-static esp_now_send_cb_t s_sendCb  = nullptr;
+static int s_sock                 = -1;
+static esp_now_recv_cb_t s_recvCb = nullptr;
+static esp_now_send_cb_t s_sendCb = nullptr;
 static pthread_t s_recvThread;
 static bool s_running = false;
 
@@ -63,7 +84,7 @@ int esp_now_init() {
     int opt = 1;
     setsockopt(s_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-    struct sockaddr_in addr {};
+    struct sockaddr_in addr{};
     addr.sin_family      = AF_INET;
     addr.sin_port        = htons(SIM_LISTEN_PORT);
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
@@ -76,7 +97,7 @@ int esp_now_init() {
     }
 
     /* Set a receive timeout so the thread can check s_running. */
-    struct timeval tv { .tv_sec = 0, .tv_usec = 100000 }; /* 100 ms */
+    struct timeval tv{.tv_sec = 0, .tv_usec = 100000}; /* 100 ms */
     setsockopt(s_sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
     esp_read_mac(s_localMac, ESP_MAC_WIFI_STA);
@@ -85,8 +106,7 @@ int esp_now_init() {
     s_running = true;
     pthread_create(&s_recvThread, nullptr, recvLoop, nullptr);
 
-    printf("[SIM] ESP-NOW init OK – listening on port %d, sending to port %d\n",
-           SIM_LISTEN_PORT, SIM_SEND_PORT);
+    printf("[SIM] ESP-NOW init OK – listening on port %d, sending to port %d\n", SIM_LISTEN_PORT, SIM_SEND_PORT);
     return ESP_OK;
 }
 
@@ -111,7 +131,8 @@ int esp_now_register_send_cb(esp_now_send_cb_t cb) {
 }
 
 int esp_now_send(const uint8_t *peer_addr, const uint8_t *data, int len) {
-    if (s_sock < 0 || len <= 0) return ESP_FAIL;
+    if (s_sock < 0 || len <= 0)
+        return ESP_FAIL;
 
     /* Prepend our MAC address to the payload. */
     uint8_t buf[6 + ESP_NOW_MAX_DATA_LEN];
@@ -119,16 +140,14 @@ int esp_now_send(const uint8_t *peer_addr, const uint8_t *data, int len) {
     int copyLen = len < ESP_NOW_MAX_DATA_LEN ? len : ESP_NOW_MAX_DATA_LEN;
     memcpy(buf + 6, data, copyLen);
 
-    struct sockaddr_in dest {};
+    struct sockaddr_in dest{};
     dest.sin_family      = AF_INET;
     dest.sin_port        = htons(SIM_SEND_PORT);
     dest.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-    ssize_t sent = sendto(s_sock, buf, 6 + copyLen, 0,
-                          reinterpret_cast<sockaddr *>(&dest), sizeof(dest));
+    ssize_t sent = sendto(s_sock, buf, 6 + copyLen, 0, reinterpret_cast<sockaddr *>(&dest), sizeof(dest));
 
-    esp_now_send_status_t status =
-        (sent > 0) ? ESP_NOW_SEND_SUCCESS : ESP_NOW_SEND_FAIL;
+    esp_now_send_status_t status = (sent > 0) ? ESP_NOW_SEND_SUCCESS : ESP_NOW_SEND_FAIL;
 
     if (s_sendCb) {
         s_sendCb(peer_addr, status);
@@ -138,11 +157,13 @@ int esp_now_send(const uint8_t *peer_addr, const uint8_t *data, int len) {
 }
 
 int esp_now_add_peer(const esp_now_peer_info_t *peer) {
-    if (!peer) return ESP_FAIL;
+    if (!peer)
+        return ESP_FAIL;
     std::lock_guard<std::mutex> lock(s_peerMutex);
     /* Don't add duplicates. */
     for (auto &p : s_peers) {
-        if (memcmp(p.mac, peer->peer_addr, 6) == 0) return ESP_OK;
+        if (memcmp(p.mac, peer->peer_addr, 6) == 0)
+            return ESP_OK;
     }
     PeerEntry e;
     memcpy(e.mac, peer->peer_addr, 6);
@@ -165,7 +186,8 @@ int esp_now_del_peer(const uint8_t *peer_addr) {
 bool esp_now_is_peer_exist(const uint8_t *peer_addr) {
     std::lock_guard<std::mutex> lock(s_peerMutex);
     for (auto &p : s_peers) {
-        if (memcmp(p.mac, peer_addr, 6) == 0) return true;
+        if (memcmp(p.mac, peer_addr, 6) == 0)
+            return true;
     }
     return false;
 }

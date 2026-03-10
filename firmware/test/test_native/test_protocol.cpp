@@ -1,3 +1,24 @@
+/*
+ * Copyright (C) 2026 Peter Buchegger
+ *
+ * This file is part of OpenDriveHub.
+ *
+ * OpenDriveHub is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * OpenDriveHub is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with OpenDriveHub. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 /**
  * Native unit tests for the ODH protocol utilities.
  *
@@ -32,10 +53,8 @@ void test_checksum_xor_properties(void) {
 }
 
 void test_checksum_known_vector(void) {
-    uint8_t data[] = {kMagic0, kMagic1, kProtocolVersion,
-                      static_cast<uint8_t>(PacketType::Control)};
-    uint8_t expected =
-        kMagic0 ^ kMagic1 ^ kProtocolVersion ^ static_cast<uint8_t>(PacketType::Control);
+    uint8_t data[]   = {kMagic0, kMagic1, kProtocolVersion, static_cast<uint8_t>(PacketType::Control)};
+    uint8_t expected = kMagic0 ^ kMagic1 ^ kProtocolVersion ^ static_cast<uint8_t>(PacketType::Control);
     TEST_ASSERT_EQUAL_UINT8(expected, checksum(data, 4));
 }
 
@@ -151,8 +170,7 @@ void test_announce_name_max_length(void) {
 /* ── Disconnect packet type ──────────────────────────────────────────────── */
 
 void test_disconnect_packet_type(void) {
-    TEST_ASSERT_NOT_EQUAL(static_cast<uint8_t>(PacketType::Bind),
-                          static_cast<uint8_t>(PacketType::Disconnect));
+    TEST_ASSERT_NOT_EQUAL(static_cast<uint8_t>(PacketType::Bind), static_cast<uint8_t>(PacketType::Disconnect));
     TEST_ASSERT_EQUAL_UINT8(0x40, static_cast<uint8_t>(PacketType::Disconnect));
 }
 
@@ -175,14 +193,10 @@ void test_link_state_scanning_value(void) {
 }
 
 void test_link_state_scanning_distinct(void) {
-    TEST_ASSERT_NOT_EQUAL(static_cast<uint8_t>(LinkState::Disconnected),
-                          static_cast<uint8_t>(LinkState::Scanning));
-    TEST_ASSERT_NOT_EQUAL(static_cast<uint8_t>(LinkState::Binding),
-                          static_cast<uint8_t>(LinkState::Scanning));
-    TEST_ASSERT_NOT_EQUAL(static_cast<uint8_t>(LinkState::Connected),
-                          static_cast<uint8_t>(LinkState::Scanning));
-    TEST_ASSERT_NOT_EQUAL(static_cast<uint8_t>(LinkState::Failsafe),
-                          static_cast<uint8_t>(LinkState::Scanning));
+    TEST_ASSERT_NOT_EQUAL(static_cast<uint8_t>(LinkState::Disconnected), static_cast<uint8_t>(LinkState::Scanning));
+    TEST_ASSERT_NOT_EQUAL(static_cast<uint8_t>(LinkState::Binding), static_cast<uint8_t>(LinkState::Scanning));
+    TEST_ASSERT_NOT_EQUAL(static_cast<uint8_t>(LinkState::Connected), static_cast<uint8_t>(LinkState::Scanning));
+    TEST_ASSERT_NOT_EQUAL(static_cast<uint8_t>(LinkState::Failsafe), static_cast<uint8_t>(LinkState::Scanning));
 }
 
 void test_max_discovered_constant(void) {
@@ -196,8 +210,7 @@ static uint16_t pot_map(int32_t raw, int32_t adcMax) {
         raw = 0;
     if (raw > adcMax)
         raw = adcMax;
-    uint32_t mapped = kChannelMin + (static_cast<uint32_t>(raw) * (kChannelMax - kChannelMin)) /
-                                        static_cast<uint32_t>(adcMax);
+    uint32_t mapped = kChannelMin + (static_cast<uint32_t>(raw) * (kChannelMax - kChannelMin)) / static_cast<uint32_t>(adcMax);
     return static_cast<uint16_t>(mapped);
 }
 
@@ -225,8 +238,7 @@ void test_pot_map_clamps_overflow(void) {
 static uint16_t enc_map(uint16_t raw) {
     if (raw > 4095)
         raw = 4095;
-    uint32_t mapped =
-        kChannelMin + (static_cast<uint32_t>(raw) * (kChannelMax - kChannelMin)) / 4095u;
+    uint32_t mapped = kChannelMin + (static_cast<uint32_t>(raw) * (kChannelMax - kChannelMin)) / 4095u;
     return static_cast<uint16_t>(mapped);
 }
 

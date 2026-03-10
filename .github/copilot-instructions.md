@@ -68,6 +68,39 @@ Always run builds from the `firmware/` directory – `platformio.ini` is there.
 
 ## C++ Style & Conventions
 
+### Copyright Header (mandatory)
+
+Every source file (`.cpp`, `.h`, `.c`) **must** start with the GPL-3.0 copyright
+header. For HTML files, use `<!-- … -->` comment syntax. For Python files, use
+`#` comment syntax.
+
+```cpp
+/*
+ * Copyright (C) 2026 Peter Buchegger
+ *
+ * This file is part of OpenDriveHub.
+ *
+ * OpenDriveHub is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * OpenDriveHub is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with OpenDriveHub. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+```
+
+When creating a **new** file, always include this header as the very first thing.
+Existing Doxygen `/** … */` file-level documentation follows **after** the
+copyright block.
+
 ### Language Standard
 - ESP32 targets: **`-std=gnu++2a`** (C++20 on GCC 8.4)
 - Native/sim targets: **`-std=gnu++20`**
@@ -167,6 +200,7 @@ The CI workflow (`.github/workflows/ci.yml`) runs on push/PR to main/master:
 | `build-sim-tx`     | `pio run -e sim_tx` (needs `libsdl2-dev`)   |
 | `clang-format`     | Formatting check (clang-format-19)          |
 | `cppcheck`         | Static analysis                             |
+| `license-headers`  | Copyright header check (SPDX identifier)    |
 
 After ANY code change, verify at minimum:
 1. `pio test -e native` – all 90 tests pass
@@ -174,6 +208,7 @@ After ANY code change, verify at minimum:
 3. `pio run -e transmitter` – compiles
 4. **clang-format** – all changed files must be formatted before committing
 5. **cppcheck** – no new warnings allowed
+6. **copyright header** – all new files must have the GPL-3.0 header
 
 ### clang-format (mandatory)
 
