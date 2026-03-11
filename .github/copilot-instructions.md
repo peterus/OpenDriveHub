@@ -33,7 +33,7 @@ firmware/                  # Single unified PlatformIO project
 │   ├── receiver/          # Static HTML/CSS/JS for receiver web UI
 │   └── transmitter/       # Static HTML/CSS/JS for transmitter web UI
 ├── include/               # lv_conf.h, User_Setup.h (TFT_eSPI pin config)
-├── sim/                   # Simulation shim headers + sources for sim_rx / sim_tx
+├── sim/                   # Simulation shim headers + sources for sim_rx / sim_tx / sim_tx_gui
 │   ├── include/           #   Arduino.h, Wire.h, esp_now.h, Preferences.h, etc.
 │   ├── src/               #   sim_arduino.cpp, sim_espnow.cpp, sim_freertos.cpp, etc.
 │   └── sim_build.py       #   PlatformIO extra_script
@@ -51,7 +51,8 @@ hardware/                  # Hardware design docs (transmitter, receiver, module
 | `transmitter`  | `espressif32`  | ESP32 transmitter firmware       | `ODH_TRANSMITTER`                  |
 | `native`       | `native`       | Host unit tests (Unity)          | `NATIVE_TEST`                      |
 | `sim_rx`       | `native`       | Receiver simulation (terminal)   | `NATIVE_SIM`, `ODH_RECEIVER`, `SIM_RX`  |
-| `sim_tx`       | `native`       | Transmitter simulation (SDL2)    | `NATIVE_SIM`, `ODH_TRANSMITTER`, `SIM_TX` |
+| `sim_tx`       | `native`       | Transmitter simulation (headless terminal) | `NATIVE_SIM`, `ODH_TRANSMITTER`, `SIM_TX`, `ODH_HEADLESS` |
+| `sim_tx_gui`   | `native`       | Transmitter simulation (SDL2)    | `NATIVE_SIM`, `ODH_TRANSMITTER`, `SIM_TX` |
 
 ### Build Commands
 
@@ -61,7 +62,8 @@ pio run -e receiver              # Build receiver
 pio run -e transmitter           # Build transmitter
 pio test -e native               # Run 90 unit tests
 pio run -e sim_rx -t exec        # Run receiver simulation
-pio run -e sim_tx -t exec        # Run transmitter simulation (SDL2 window)
+pio run -e sim_tx -t exec        # Run transmitter simulation (headless terminal)
+pio run -e sim_tx_gui -t exec    # Run transmitter simulation (SDL2 window)
 ```
 
 Always run builds from the `firmware/` directory – `platformio.ini` is there.
@@ -177,7 +179,7 @@ copyright block.
 - FreeRTOS → pthreads
 - I²C (Wire) → in-memory stubs
 - Preferences → in-memory key-value store
-- LCD+LVGL → SDL2 (sim_tx only)
+- LCD+LVGL → SDL2 (sim_tx_gui only)
 - `sim_build.py` adds shim includes and sources automatically
 
 ### Configuration (`odh-config`)
@@ -197,7 +199,8 @@ The CI workflow (`.github/workflows/ci.yml`) runs on push/PR to main/master:
 | `build-transmitter`| `pio run -e transmitter`                    |
 | `build-receiver`   | `pio run -e receiver`                       |
 | `build-sim-rx`     | `pio run -e sim_rx`                         |
-| `build-sim-tx`     | `pio run -e sim_tx` (needs `libsdl2-dev`)   |
+| `build-sim-tx`     | `pio run -e sim_tx`                         |
+| `build-sim-tx-gui` | `pio run -e sim_tx_gui` (needs `libsdl2-dev`)|
 | `clang-format`     | Formatting check (clang-format-19)          |
 | `cppcheck`         | Static analysis                             |
 | `license-headers`  | Copyright header check (SPDX identifier)    |

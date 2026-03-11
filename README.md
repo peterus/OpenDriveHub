@@ -92,7 +92,7 @@ cd firmware
 # Terminal 1 – receiver
 pio run -e sim_rx -t exec
 
-# Terminal 2 – transmitter (opens SDL2 window)
+# Terminal 2 – transmitter (headless terminal simulation)
 pio run -e sim_tx -t exec
 ```
 

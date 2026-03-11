@@ -35,6 +35,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <mutex>
 #include <string>
 
 /* ── Arduino-compatible types ───────────────────────────────────────────── */
@@ -90,71 +91,94 @@ typedef int esp_err_t;
 /* ── Serial ─────────────────────────────────────────────────────────────── */
 
 /**
- * Minimal Serial class that prints to stdout.
+ * Minimal Serial class that prints to stdout and (in simulation builds)
+ * reads from a ring buffer fed by a background stdin-reader thread.
+ *
+ * When stdout is not a terminal (e.g. PlatformIO pipes it through an
+ * async reader), output is written directly to /dev/tty so that shell
+ * prompts and character echo are visible immediately.
  */
 class HardwareSerial {
 public:
-    void begin(unsigned long) {}
+    void begin(unsigned long) {
+        initOutput();
+    }
     void end() {}
 
-    /* print / println for basic types */
-    size_t print(const char *s) {
-        return printf("%s", s);
-    }
-    size_t print(int v) {
-        return printf("%d", v);
-    }
-    size_t print(unsigned v) {
-        return printf("%u", v);
-    }
-    size_t print(long v) {
-        return printf("%ld", v);
-    }
-    size_t print(unsigned long v) {
-        return printf("%lu", v);
-    }
-    size_t print(double v, int prec = 2) {
-        return printf("%.*f", prec, v);
+    /// Initialise output – call before first print if begin() is skipped.
+    void initOutput();
+
+    /* ── Input (ring-buffer backed by stdin reader thread) ──────────── */
+
+    int available() {
+        std::lock_guard<std::mutex> lock(_rxMutex);
+        return static_cast<int>((_rxHead - _rxTail + kRxBufSize) % kRxBufSize);
     }
 
-    size_t println() {
-        return printf("\n");
-    }
-    size_t println(const char *s) {
-        return printf("%s\n", s);
-    }
-    size_t println(int v) {
-        return printf("%d\n", v);
-    }
-    size_t println(unsigned v) {
-        return printf("%u\n", v);
-    }
-    size_t println(long v) {
-        return printf("%ld\n", v);
-    }
-    size_t println(unsigned long v) {
-        return printf("%lu\n", v);
-    }
-    size_t println(double v, int prec = 2) {
-        return printf("%.*f\n", prec, v);
+    int read() {
+        std::lock_guard<std::mutex> lock(_rxMutex);
+        if (_rxHead == _rxTail)
+            return -1;
+        uint8_t c = _rxBuf[_rxTail];
+        _rxTail   = (_rxTail + 1) % kRxBufSize;
+        return c;
     }
 
-    /* The F() macro just passes through the string on native. */
-    size_t print(const std::string &s) {
-        return printf("%s", s.c_str());
-    }
-    size_t println(const std::string &s) {
-        return printf("%s\n", s.c_str());
+    int peek() {
+        std::lock_guard<std::mutex> lock(_rxMutex);
+        if (_rxHead == _rxTail)
+            return -1;
+        return _rxBuf[_rxTail];
     }
 
-    /* ESP32-Arduino Serial.printf() */
-    size_t printf(const char *fmt, ...) __attribute__((format(printf, 2, 3))) {
-        va_list args;
-        va_start(args, fmt);
-        int r = vprintf(fmt, args);
-        va_end(args);
-        return r > 0 ? static_cast<size_t>(r) : 0;
+    /// Push a byte into the receive buffer (called by the stdin reader thread).
+    void pushRxByte(uint8_t c) {
+        std::lock_guard<std::mutex> lock(_rxMutex);
+        uint16_t next = (_rxHead + 1) % kRxBufSize;
+        if (next != _rxTail) {
+            _rxBuf[_rxHead] = c;
+            _rxHead         = next;
+        }
     }
+
+    /* ── Output ────────────────────────────────────────────────────── */
+
+    size_t print(const char *s);
+    size_t print(int v);
+    size_t print(unsigned v);
+    size_t print(long v);
+    size_t print(unsigned long v);
+    size_t print(double v, int prec = 2);
+
+    size_t println();
+    size_t println(const char *s);
+    size_t println(int v);
+    size_t println(unsigned v);
+    size_t println(long v);
+    size_t println(unsigned long v);
+    size_t println(double v, int prec = 2);
+
+    size_t print(const std::string &s);
+    size_t println(const std::string &s);
+
+    size_t printf(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+
+    /// Return the output FILE* stream, initialising on first call.
+    FILE *outputStream() {
+        if (!_outReady)
+            initOutput();
+        return _out;
+    }
+
+private:
+    static constexpr uint16_t kRxBufSize = 256;
+    uint8_t _rxBuf[kRxBufSize]           = {};
+    uint16_t _rxHead                     = 0;
+    uint16_t _rxTail                     = 0;
+    std::mutex _rxMutex;
+
+    FILE *_out     = nullptr; // output stream (stdout or /dev/tty)
+    bool _outReady = false;
 };
 
 extern HardwareSerial Serial;

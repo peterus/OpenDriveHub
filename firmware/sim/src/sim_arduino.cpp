@@ -29,10 +29,98 @@
 #include <cstdio>
 #include <cstdlib>
 #include <thread>
+#include <unistd.h>
+
+#ifdef __has_include
+#if __has_include(<termios.h>)
+#include <fcntl.h>
+#include <termios.h>
+#define HAS_TERMIOS 1
+#endif
+#endif
 
 /* ── Global instances ───────────────────────────────────────────────────── */
 
 HardwareSerial Serial;
+
+/* ── HardwareSerial output ──────────────────────────────────────────────── */
+
+void HardwareSerial::initOutput() {
+    if (_outReady)
+        return;
+    _outReady = true;
+
+    if (isatty(STDOUT_FILENO)) {
+        _out = stdout;
+        return;
+    }
+
+    // stdout is a pipe (e.g. PlatformIO exec).  PlatformIO's BuildAsyncPipe
+    // buffers output line-by-line, which breaks interactive shell prompts
+    // and character echo.  Write directly to the controlling terminal.
+    _out = fopen("/dev/tty", "w");
+    if (_out) {
+        setvbuf(_out, nullptr, _IONBF, 0);
+    } else {
+        _out = stdout; // no terminal – fall back to pipe
+    }
+}
+
+size_t HardwareSerial::print(const char *s) {
+    return static_cast<size_t>(fprintf(outputStream(), "%s", s));
+}
+size_t HardwareSerial::print(int v) {
+    return static_cast<size_t>(fprintf(outputStream(), "%d", v));
+}
+size_t HardwareSerial::print(unsigned v) {
+    return static_cast<size_t>(fprintf(outputStream(), "%u", v));
+}
+size_t HardwareSerial::print(long v) {
+    return static_cast<size_t>(fprintf(outputStream(), "%ld", v));
+}
+size_t HardwareSerial::print(unsigned long v) {
+    return static_cast<size_t>(fprintf(outputStream(), "%lu", v));
+}
+size_t HardwareSerial::print(double v, int prec) {
+    return static_cast<size_t>(fprintf(outputStream(), "%.*f", prec, v));
+}
+
+size_t HardwareSerial::println() {
+    return static_cast<size_t>(fprintf(outputStream(), "\n"));
+}
+size_t HardwareSerial::println(const char *s) {
+    return static_cast<size_t>(fprintf(outputStream(), "%s\n", s));
+}
+size_t HardwareSerial::println(int v) {
+    return static_cast<size_t>(fprintf(outputStream(), "%d\n", v));
+}
+size_t HardwareSerial::println(unsigned v) {
+    return static_cast<size_t>(fprintf(outputStream(), "%u\n", v));
+}
+size_t HardwareSerial::println(long v) {
+    return static_cast<size_t>(fprintf(outputStream(), "%ld\n", v));
+}
+size_t HardwareSerial::println(unsigned long v) {
+    return static_cast<size_t>(fprintf(outputStream(), "%lu\n", v));
+}
+size_t HardwareSerial::println(double v, int prec) {
+    return static_cast<size_t>(fprintf(outputStream(), "%.*f\n", prec, v));
+}
+
+size_t HardwareSerial::print(const std::string &s) {
+    return static_cast<size_t>(fprintf(outputStream(), "%s", s.c_str()));
+}
+size_t HardwareSerial::println(const std::string &s) {
+    return static_cast<size_t>(fprintf(outputStream(), "%s\n", s.c_str()));
+}
+
+size_t HardwareSerial::printf(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int r = vfprintf(outputStream(), fmt, args);
+    va_end(args);
+    return r > 0 ? static_cast<size_t>(r) : 0;
+}
 
 /* ── Time ───────────────────────────────────────────────────────────────── */
 
@@ -89,10 +177,72 @@ void esp_read_mac(uint8_t *mac, esp_mac_type_t) {
 
 /* ── Arduino main() bridge ──────────────────────────────────────────────── */
 
+#ifdef HAS_TERMIOS
+static struct termios s_origTermios;
+static int s_ttyFd = -1;
+
+/// Enable raw mode on the given file descriptor.
+static void enableRawModeOnFd(int fd) {
+    tcgetattr(fd, &s_origTermios);
+    atexit([] {
+        int restoreFd = (s_ttyFd >= 0) ? s_ttyFd : STDIN_FILENO;
+        tcsetattr(restoreFd, TCSAFLUSH, &s_origTermios);
+    });
+
+    struct termios raw = s_origTermios;
+    raw.c_lflag &= ~(static_cast<tcflag_t>(ICANON) | static_cast<tcflag_t>(ECHO));
+    raw.c_cc[VMIN]  = 1;
+    raw.c_cc[VTIME] = 0;
+    tcsetattr(fd, TCSAFLUSH, &raw);
+}
+
+/// Open the controlling terminal for input.  When stdin is a pipe (e.g.
+/// PlatformIO exec), /dev/tty gives us direct access to the real terminal.
+/// Returns the fd to read from (STDIN_FILENO or /dev/tty).
+static int openTerminalInput() {
+    if (isatty(STDIN_FILENO)) {
+        enableRawModeOnFd(STDIN_FILENO);
+        return STDIN_FILENO;
+    }
+    // stdin is a pipe – try the controlling terminal directly.
+    int fd = open("/dev/tty", O_RDONLY);
+    if (fd >= 0) {
+        s_ttyFd = fd;
+        enableRawModeOnFd(fd);
+        return fd;
+    }
+    // No terminal at all (CI, headless server) – fall back to stdin pipe.
+    return STDIN_FILENO;
+}
+#endif
+
+/// Background thread that reads from the terminal (or stdin) and feeds
+/// bytes into the Serial receive ring buffer.
+static void stdinReaderThread(int fd) {
+    while (true) {
+        uint8_t c;
+        ssize_t n = ::read(fd, &c, 1);
+        if (n <= 0)
+            break;
+        Serial.pushRxByte(c);
+    }
+}
+
 int main(int, char **) {
-    /* Line-buffer stdout so Serial.print/println output is visible immediately
-     * even when piped through PlatformIO's exec runner. */
-    setvbuf(stdout, nullptr, _IOLBF, 0);
+    /* Disable buffering on both stdout and stdin so the interactive shell
+     * prompt, character echo and input are immediate. */
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    setvbuf(stdin, nullptr, _IONBF, 0);
+
+    int inputFd = STDIN_FILENO;
+#ifdef HAS_TERMIOS
+    inputFd = openTerminalInput();
+#endif
+
+    /* Start stdin reader as a background daemon thread. */
+    std::thread reader(stdinReaderThread, inputFd);
+    reader.detach();
+
     setup();
     for (;;) {
         loop();

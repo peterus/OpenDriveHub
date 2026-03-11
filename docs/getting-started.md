@@ -165,13 +165,17 @@ cd firmware
 # Terminal 1 – receiver
 pio run -e sim_rx -t exec
 
-# Terminal 2 – transmitter (opens SDL2 window)
+# Terminal 2 – transmitter (headless terminal simulation)
 pio run -e sim_tx -t exec
+
+# Optional: transmitter with SDL2 GUI (requires libsdl2-dev)
+pio run -e sim_tx_gui -t exec
 ```
 
-The receiver starts announcing immediately.  The transmitter opens an SDL2
-window showing the scan screen.  After a few seconds the vehicle appears as a
-button – click it to connect.
+The receiver starts announcing immediately.  The headless transmitter simulation
+runs in the terminal.  For a graphical display, use `sim_tx_gui` which opens an
+SDL2 window showing the scan screen.  After a few seconds the vehicle appears as
+a button – click it to connect.
 
 The web config UI is also available in simulation:
 - Transmitter: `http://localhost:8080`

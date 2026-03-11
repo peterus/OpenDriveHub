@@ -54,7 +54,7 @@ firmware is built from a single PlatformIO project located in `firmware/`.
 
 ```
 firmware/
-├── platformio.ini         # Unified build: receiver, transmitter, native, sim_rx, sim_tx
+├── platformio.ini         # Unified build: receiver, transmitter, native, sim_rx, sim_tx, sim_tx_gui
 ├── lib/                   # Shared libraries (used by both targets)
 │   ├── odh-protocol/      #   Protocol.h, FunctionMap.h
 │   ├── odh-config/        #   Config.h, NvsStore.h (compile-time + NVS)
@@ -79,7 +79,7 @@ firmware/
 │   ├── receiver/          # Static web UI (HTML/CSS/JS) for receiver
 │   └── transmitter/       # Static web UI for transmitter
 ├── include/               # Board-level overrides (lv_conf.h, User_Setup.h)
-├── sim/                   # Simulation shim headers for sim_rx / sim_tx
+├── sim/                   # Simulation shim headers for sim_rx / sim_tx / sim_tx_gui
 └── test/
     └── test_native/       # Unity tests (90 cases)
 ```
@@ -216,8 +216,8 @@ bus that connects input modules to the transmitter.
 
 ## Simulation
 
-Two simulation environments (`sim_rx`, `sim_tx`) build the full firmware as
-a Linux executable.  Hardware peripherals are replaced by software shims:
+Three simulation environments (`sim_rx`, `sim_tx`, `sim_tx_gui`) build the full
+firmware as a Linux executable.  Hardware peripherals are replaced by software shims:
 
 | Hardware | Simulation Shim |
 |----------|----------------|
@@ -225,14 +225,15 @@ a Linux executable.  Hardware peripherals are replaced by software shims:
 | FreeRTOS | pthreads / BSD timers |
 | I²C (Wire) | In-memory virtual bus |
 | Preferences (NVS) | In-memory key-value store |
-| ILI9341 LCD + LVGL | SDL2 window (sim_tx only) |
+| ILI9341 LCD + LVGL | SDL2 window (sim_tx_gui only) |
 | PCA9685 / ADS1115 | Console logging |
 | WiFi / WebServer | Localhost HTTP |
 
 ```bash
 cd firmware
-pio run -e sim_rx -t exec   # receiver simulation
-pio run -e sim_tx -t exec   # transmitter simulation (opens SDL2 window)
+pio run -e sim_rx -t exec       # receiver simulation
+pio run -e sim_tx -t exec       # transmitter simulation (headless terminal)
+pio run -e sim_tx_gui -t exec   # transmitter simulation (SDL2 window)
 ```
 
 See `firmware/sim/README.md` for keyboard shortcuts and known limitations.
@@ -241,7 +242,7 @@ See `firmware/sim/README.md` for keyboard shortcuts and known limitations.
 
 ## Build Environments
 
-The unified `firmwave/platformio.ini` defines five environments:
+The unified `firmware/platformio.ini` defines six environments:
 
 | Environment | Target | Board | Framework |
 |-------------|--------|-------|-----------|
@@ -250,16 +251,18 @@ The unified `firmwave/platformio.ini` defines five environments:
 | `native` | Host | native | — |
 | `sim_rx` | Host (Linux) | native | — |
 | `sim_tx` | Host (Linux) | native | — |
+| `sim_tx_gui` | Host (Linux) | native | — |
 
 Build commands:
 
 ```bash
 cd firmware
-pio run -e receiver          # build receiver
-pio run -e transmitter       # build transmitter
-pio test -e native           # run 90 unit tests
-pio run -e sim_rx -t exec    # run receiver sim
-pio run -e sim_tx -t exec    # run transmitter sim
+pio run -e receiver              # build receiver
+pio run -e transmitter           # build transmitter
+pio test -e native               # run 90 unit tests
+pio run -e sim_rx -t exec        # run receiver sim
+pio run -e sim_tx -t exec        # run transmitter sim (headless)
+pio run -e sim_tx_gui -t exec    # run transmitter sim (SDL2 window)
 ```
 
 ---

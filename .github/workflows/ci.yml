@@ -123,9 +123,37 @@ jobs:
         working-directory: firmware
         run: pio run -e sim_rx
 
-  # ── Transmitter simulation build ───────────────────────────────────────
+  # ── Transmitter simulation build (headless) ───────────────────────────
   build-sim-tx:
     name: Build transmitter simulation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-sim-${{ hashFiles('firmware/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-sim-
+
+      - name: Build transmitter simulation
+        working-directory: firmware
+        run: pio run -e sim_tx
+
+  # ── Transmitter simulation build (SDL2 GUI) ─────────────────────────
+  build-sim-tx-gui:
+    name: Build transmitter simulation (GUI)
     runs-on: ubuntu-latest
 
     steps:
@@ -150,9 +178,45 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pio-sim-
 
-      - name: Build transmitter simulation
+      - name: Build transmitter simulation (GUI)
         working-directory: firmware
-        run: pio run -e sim_tx
+        run: pio run -e sim_tx_gui
+
+  # ── Console integration tests (simulation) ──────────────────────────────
+  console-tests:
+    name: Console tests (${{ matrix.target }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [sim_rx, sim_tx]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Install test dependencies
+        run: pip install -r firmware/test/test_console/requirements.txt
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-sim-${{ hashFiles('firmware/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-sim-
+
+      - name: Run console tests (${{ matrix.target }})
+        working-directory: firmware/test/test_console
+        run: pytest --target=${{ matrix.target }} -v
 
   # ── clang-format style check ───────────────────────────────────────────
   clang-format:

@@ -23,6 +23,7 @@
 
 #include <Arduino.h>
 
+#include <Shell.h>
 #include <cstring>
 
 #ifndef NATIVE_SIM
@@ -32,6 +33,8 @@
 #else
 #include "output/LoggingOutput.h"
 #endif
+
+#include "shell/ReceiverShellCommands.h"
 
 namespace odh {
 
@@ -124,6 +127,10 @@ void ReceiverApp::begin() {
 
     xTaskCreatePinnedToCore(taskTelemetryFn, "telemetry", config::rx::kTaskTelemetryStackWords, this, config::rx::kTaskTelemetryPriority, nullptr, config::rx::kTaskTelemetryCore);
 
+    // ── Shell console ───────────────────────────────────────────────
+    registerReceiverShellCommands(_shell, *this);
+    xTaskCreatePinnedToCore(taskShellFn, "shell", config::kShellTaskStackWords, this, config::kShellTaskPriority, nullptr, config::kShellTaskCore);
+
     Serial.println(F("[ODH-RX] Setup complete"));
 }
 
@@ -149,6 +156,10 @@ void ReceiverApp::taskTelemetryFn(void *param) {
 
 void ReceiverApp::taskWebFn(void *param) {
     static_cast<ReceiverApp *>(param)->runWebLoop();
+}
+
+void ReceiverApp::taskShellFn(void *param) {
+    static_cast<ReceiverApp *>(param)->runShellLoop();
 }
 
 // ── Output loop (50 Hz) ─────────────────────────────────────────────────
@@ -201,7 +212,22 @@ void ReceiverApp::runWebLoop() {
     }
 }
 
+// ── Shell loop ──────────────────────────────────────────────────────────
+
+void ReceiverApp::runShellLoop() {
+    for (;;) {
+        _shell.poll();
+        vTaskDelay(pdMS_TO_TICKS(config::kShellPollIntervalMs));
+    }
+}
+
 // ── NVS helpers ─────────────────────────────────────────────────────────
+
+void ReceiverApp::setVehicleName(const char *name) {
+    std::strncpy(_vehicleName, name, kVehicleNameMax - 1);
+    _vehicleName[kVehicleNameMax - 1] = '\0';
+    saveVehicleName();
+}
 
 void ReceiverApp::loadVehicleName() {
     NvsStore store("odh", true);
