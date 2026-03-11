@@ -245,8 +245,9 @@ static int cmdTrim(Shell &shell, int argc, const char *const *argv, void *ctx) {
 
 // ── module ──────────────────────────────────────────────────────────────
 
+// cppcheck-suppress constParameterCallback
 static int cmdModule(Shell &shell, int, const char *const *, void *ctx) {
-    auto &app = *static_cast<TransmitterApp *>(ctx);
+    const auto &app = *static_cast<const TransmitterApp *>(ctx);
 
     for (uint8_t s = 0; s < app.modules().slotCount(); ++s) {
         const char *typeStr = "empty";
