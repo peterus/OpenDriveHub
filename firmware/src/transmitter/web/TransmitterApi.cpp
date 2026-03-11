@@ -108,8 +108,7 @@ void TransmitterApi::handleGetConfig(AsyncWebServerRequest *req) {
     NvsStore nvs("odh", true);
     JsonDocument doc;
 
-    doc["device_name"]   = nvs.getString("dev_name", "TX");
-    doc["radio_channel"] = nvs.getU8("radio_ch", 1);
+    doc["device_name"] = nvs.getString("dev_name", "TX");
 
     uint8_t model          = nvs.getU8("model_type", static_cast<uint8_t>(ModelType::Generic));
     doc["model_type"]      = model;
@@ -192,11 +191,6 @@ void TransmitterApi::handlePostConfig(AsyncWebServerRequest *req, const uint8_t 
 
     if (doc["device_name"].is<const char *>()) {
         nvs.putString("dev_name", doc["device_name"].as<const char *>());
-    }
-    if (doc["radio_channel"].is<uint8_t>()) {
-        uint8_t ch = doc["radio_channel"].as<uint8_t>();
-        if (ch >= 1 && ch <= 13)
-            nvs.putU8("radio_ch", ch);
     }
     if (doc["model_type"].is<uint8_t>()) {
         uint8_t m = doc["model_type"].as<uint8_t>();

@@ -38,9 +38,6 @@ namespace odh::config {
 
 // ── Shared settings ─────────────────────────────────────────────────────
 
-/// ESP-NOW WiFi channel (1-13). Must match on TX and RX.
-inline constexpr uint8_t kRadioWifiChannel = 1;
-
 /// Failsafe timeout (ms) – if no control packet arrives within this window,
 /// the receiver applies failsafe values.
 inline constexpr uint32_t kRadioFailsafeTimeoutMs = 500;
@@ -74,9 +71,6 @@ inline constexpr uint8_t kChannelCount = 8;
 
 /// Default vehicle name for broadcast announcements.
 inline constexpr const char *kVehicleName = "Vehicle";
-
-/// Announce broadcast interval (ms).
-inline constexpr uint32_t kAnnounceIntervalMs = 500;
 
 /// Telemetry send interval (ms).
 inline constexpr uint32_t kTelemetrySendIntervalMs = 100;

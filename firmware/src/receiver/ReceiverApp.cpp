@@ -23,6 +23,8 @@
 
 #include <Arduino.h>
 
+#include <Channel.h>
+#include <ChannelScanner.h>
 #include <cstring>
 
 #ifndef NATIVE_SIM
@@ -89,20 +91,31 @@ void ReceiverApp::begin() {
     _channelsMux = xSemaphoreCreateMutex();
 
     // ── Radio ───────────────────────────────────────────────────────
-    {
-        NvsStore store("odh", true);
-        const uint8_t wifiCh = store.getU8("radio_ch", config::kRadioWifiChannel);
-
-        if (!_radio.begin(wifiCh, [this](const ControlPacket &pkt) { onControlReceived(pkt); })) {
-            Serial.println(F("[ODH-RX] Radio init failed – halting"));
-            while (true)
-                delay(1000);
-        }
+    if (!_radio.begin([this](const ControlPacket &pkt) { onControlReceived(pkt); })) {
+        Serial.println(F("[ODH-RX] Radio init failed – halting"));
+        while (true)
+            delay(1000);
     }
     Serial.println(F("[ODH-RX] Radio (ESP-NOW) OK"));
 
-    _radio.beginAnnouncing(_vehicleName, static_cast<uint8_t>(_output.modelType()));
-    Serial.print(F("[ODH-RX] Announcing vehicle: "));
+    // Register channel migration callback
+    _radio.onChannelMigration([this](uint8_t newChannel) { onChannelMigration(newChannel); });
+
+    // Configure presence parameters (but don't start yet)
+    _radio.configurePresence(_vehicleName, static_cast<uint8_t>(_output.modelType()));
+
+    // Run channel discovery to find an active transmitter
+    runChannelDiscovery();
+
+    // Re-register DiscoveryResponse callback for ongoing TX activity tracking
+    _radio.onDiscoveryResponse([this](uint8_t /*ch*/, int8_t /*rssi*/, uint8_t /*devCount*/) {
+        _lastTransmitterActivityMs = millis();
+        _discoveryComplete         = true;
+    });
+
+    Serial.print(F("[ODH-RX] Active on channel "));
+    Serial.println(_currentChannel);
+    Serial.print(F("[ODH-RX] Presence broadcast: "));
     Serial.println(_vehicleName);
 
     // ── Web server + API ────────────────────────────────────────────
@@ -175,7 +188,7 @@ void ReceiverApp::runTelemetryLoop() {
     for (;;) {
         if (_radio.isBound()) {
             if (_radio.checkLinkTimeout(config::kRadioLinkTimeoutMs)) {
-                Serial.println(F("[ODH-RX] Link timeout – resuming announce"));
+                Serial.println(F("[ODH-RX] Link timeout – resuming presence"));
             }
 
             _battery.sample();
@@ -184,7 +197,8 @@ void ReceiverApp::runTelemetryLoop() {
 
             _radio.sendTelemetry(_battery.voltageMv(), _radio.lastRssi(), linkState, static_cast<uint8_t>(_output.modelType()), 0, nullptr, 0);
         } else {
-            _radio.tickAnnounce(config::rx::kAnnounceIntervalMs);
+            _radio.tickPresence(channel::kPresenceIntervalMs);
+            checkTransmitterLoss();
         }
 
         vTaskDelay(pdMS_TO_TICKS(config::rx::kTelemetrySendIntervalMs));
@@ -198,6 +212,105 @@ void ReceiverApp::runWebLoop() {
     // This task is only needed for periodic web-related maintenance.
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+// ── Channel discovery ───────────────────────────────────────────────────
+
+void ReceiverApp::runChannelDiscovery() {
+    // Wire up the ChannelScanner callbacks to our radio layer
+    ChannelScanner scanner([this](uint8_t ch) -> bool { return _radio.setChannel(ch); }, [this](uint8_t /*ch*/) -> bool { return _radio.sendDiscoveryRequest(); }, [](uint32_t ms) { delay(ms); });
+
+    // Forward DiscoveryResponse to the scanner
+    _radio.onDiscoveryResponse([&scanner](uint8_t ch, int8_t rssi, uint8_t devCount) { scanner.onDiscoveryResponse(ch, rssi, devCount); });
+
+    // Step 1: Try last known channel from NVS
+    uint8_t lastCh = loadChannel();
+    if (channel::isValidChannel(lastCh)) {
+        Serial.printf("[ODH-RX] Trying last known channel %u...\n", lastCh);
+        ScanResult result = scanner.scanChannel(lastCh);
+        if (result.foundTransmitter) {
+            _currentChannel = lastCh;
+            _radio.setChannel(lastCh);
+            _lastTransmitterActivityMs = millis();
+            _radio.beginPresence();
+            _discoveryComplete = true;
+            Serial.printf("[ODH-RX] Transmitter found on saved channel %u\n", lastCh);
+            return;
+        }
+    }
+
+    // Step 2: Scan all candidate channels
+    Serial.println(F("[ODH-RX] Scanning channels 1, 6, 11..."));
+    ScanResult results[channel::kCandidateChannelCount];
+    scanner.scanAllChannels(results);
+
+    for (uint8_t i = 0; i < channel::kCandidateChannelCount; ++i) {
+        if (results[i].foundTransmitter) {
+            _currentChannel = results[i].channel;
+            _radio.setChannel(results[i].channel);
+            saveChannel(results[i].channel);
+            _lastTransmitterActivityMs = millis();
+            _radio.beginPresence();
+            _discoveryComplete = true;
+            Serial.printf("[ODH-RX] Transmitter found on channel %u\n", results[i].channel);
+            return;
+        }
+    }
+
+    // Step 3: No transmitter found – stay on default channel and keep trying
+    _currentChannel = channel::kDefaultChannel;
+    _radio.setChannel(channel::kDefaultChannel);
+    _radio.beginPresence();
+    _discoveryComplete = false;
+    Serial.println(F("[ODH-RX] No transmitter found – will retry"));
+}
+
+uint8_t ReceiverApp::loadChannel() {
+    NvsStore store("odh", true);
+    uint8_t ch = store.getU8("radio_ch", 0);
+    if (channel::isValidChannel(ch))
+        return ch;
+    return channel::kDefaultChannel;
+}
+
+void ReceiverApp::saveChannel(uint8_t ch) {
+    if (!channel::isValidChannel(ch))
+        return;
+    NvsStore store("odh", false);
+    store.putU8("radio_ch", ch);
+}
+
+// ── Channel migration callback ─────────────────────────────────────────
+
+void ReceiverApp::onChannelMigration(uint8_t newChannel) {
+    if (!channel::isValidChannel(newChannel))
+        return;
+    Serial.printf("[ODH-RX] Channel migration → %u\n", newChannel);
+    _radio.setChannel(newChannel);
+    _currentChannel = newChannel;
+    saveChannel(newChannel);
+    _lastTransmitterActivityMs = millis();
+}
+
+// ── Transmitter loss detection ──────────────────────────────────────────
+
+void ReceiverApp::checkTransmitterLoss() {
+    // Only check if we've completed initial discovery and are not bound
+    if (_radio.isBound()) {
+        _lastTransmitterActivityMs = millis();
+        return;
+    }
+
+    // If we haven't heard from any transmitter in a while, re-enter discovery
+    if (_discoveryComplete && (millis() - _lastTransmitterActivityMs) > channel::kTransmitterLossTimeoutMs) {
+        Serial.println(F("[ODH-RX] Transmitter lost – re-entering discovery"));
+        _discoveryComplete = false;
+    }
+
+    // If not discovery complete, periodically retry discovery
+    if (!_discoveryComplete) {
+        runChannelDiscovery();
     }
 }
 

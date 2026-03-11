@@ -22,13 +22,15 @@
 /**
  * sim_espnow.cpp – ESP-NOW over UDP sockets.
  *
- * Each simulated device listens on its own port (TX=6001, RX=6002) and
- * sends to the other's port.  Packets include a 6-byte source MAC header
- * prepended to the original payload so the receive callback gets the
- * sender's address.
+ * Each WiFi channel maps to a shared UDP port (port = 7000 + channel).
+ * All devices on the same channel listen and send on the same port.
+ * Packets include a 6-byte source MAC header prepended to the original
+ * payload so the receive callback gets the sender's address.
+ * Self-packets are filtered by comparing the source MAC.
  */
 
 #include "Arduino.h"
+#include "Channel.h"
 #include "esp_now.h"
 
 #include <arpa/inet.h>
@@ -56,7 +58,46 @@ struct PeerEntry {
 static std::vector<PeerEntry> s_peers;
 static std::mutex s_peerMutex;
 
-static uint8_t s_localMac[6] = {};
+static uint8_t s_localMac[6]    = {};
+static uint8_t s_currentChannel = 1;
+
+/* ── Socket helper ──────────────────────────────────────────────────────── */
+
+static void rebindSocket() {
+    if (s_sock >= 0) {
+        close(s_sock);
+        s_sock = -1;
+    }
+
+    s_sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (s_sock < 0) {
+        perror("[SIM] socket");
+        return;
+    }
+
+    int opt = 1;
+    setsockopt(s_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    setsockopt(s_sock, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
+
+    uint16_t port = odh::channel::channelToSimPort(s_currentChannel);
+
+    struct sockaddr_in addr{};
+    addr.sin_family      = AF_INET;
+    addr.sin_port        = htons(port);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+    if (bind(s_sock, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
+        perror("[SIM] bind");
+        close(s_sock);
+        s_sock = -1;
+        return;
+    }
+
+    struct timeval tv{.tv_sec = 0, .tv_usec = 100000};
+    setsockopt(s_sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    printf("[SIM] Channel %u → UDP port %u\n", s_currentChannel, port);
+}
 
 /* ── Listener thread ────────────────────────────────────────────────────── */
 
@@ -65,6 +106,8 @@ static void *recvLoop(void *) {
     while (s_running) {
         ssize_t n = recvfrom(s_sock, buf, sizeof(buf), 0, nullptr, nullptr);
         if (n > 6 && s_recvCb) {
+            if (memcmp(buf, s_localMac, 6) == 0)
+                continue;
             s_recvCb(buf, buf + 6, static_cast<int>(n - 6));
         }
     }
@@ -74,39 +117,16 @@ static void *recvLoop(void *) {
 /* ── ESP-NOW API ────────────────────────────────────────────────────────── */
 
 int esp_now_init() {
-    /* Create a UDP socket bound to the listen port. */
-    s_sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (s_sock < 0) {
-        perror("[SIM] socket");
-        return ESP_FAIL;
-    }
-
-    int opt = 1;
-    setsockopt(s_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-
-    struct sockaddr_in addr{};
-    addr.sin_family      = AF_INET;
-    addr.sin_port        = htons(SIM_LISTEN_PORT);
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-
-    if (bind(s_sock, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
-        perror("[SIM] bind");
-        close(s_sock);
-        s_sock = -1;
-        return ESP_FAIL;
-    }
-
-    /* Set a receive timeout so the thread can check s_running. */
-    struct timeval tv{.tv_sec = 0, .tv_usec = 100000}; /* 100 ms */
-    setsockopt(s_sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
     esp_read_mac(s_localMac, ESP_MAC_WIFI_STA);
+
+    rebindSocket();
+    if (s_sock < 0)
+        return ESP_FAIL;
 
     /* Start the listener thread. */
     s_running = true;
     pthread_create(&s_recvThread, nullptr, recvLoop, nullptr);
 
-    printf("[SIM] ESP-NOW init OK – listening on port %d, sending to port %d\n", SIM_LISTEN_PORT, SIM_SEND_PORT);
     return ESP_OK;
 }
 
@@ -142,7 +162,7 @@ int esp_now_send(const uint8_t *peer_addr, const uint8_t *data, int len) {
 
     struct sockaddr_in dest{};
     dest.sin_family      = AF_INET;
-    dest.sin_port        = htons(SIM_SEND_PORT);
+    dest.sin_port        = htons(odh::channel::channelToSimPort(s_currentChannel));
     dest.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
     ssize_t sent = sendto(s_sock, buf, 6 + copyLen, 0, reinterpret_cast<sockaddr *>(&dest), sizeof(dest));
@@ -190,4 +210,17 @@ bool esp_now_is_peer_exist(const uint8_t *peer_addr) {
             return true;
     }
     return false;
+}
+
+/* ── Channel switching ──────────────────────────────────────────────────── */
+
+void sim_set_wifi_channel(uint8_t channel) {
+    s_currentChannel = channel;
+    if (s_running) {
+        rebindSocket();
+    }
+}
+
+uint8_t sim_get_wifi_channel() {
+    return s_currentChannel;
 }

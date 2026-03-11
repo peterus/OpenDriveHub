@@ -66,7 +66,7 @@ void ReceiverApi::handleGetStatus(AsyncWebServerRequest *request) {
     const char *state = "disconnected";
     if (_radio.isBound())
         state = "connected";
-    else if (_radio.isAnnouncing())
+    else if (_radio.isPresencing())
         state = "announcing";
     doc["link"]["state"] = state;
     doc["link"]["rssi"]  = _radio.lastRssi();

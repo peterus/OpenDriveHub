@@ -54,8 +54,7 @@ ReceiverRadioLink::ReceiverRadioLink() = default;
 
 // ── Initialisation ──────────────────────────────────────────────────────
 
-bool ReceiverRadioLink::begin(uint8_t wifiChannel, ControlCallback callback) {
-    _wifiChannel     = wifiChannel;
+bool ReceiverRadioLink::begin(ControlCallback callback) {
     _controlCallback = std::move(callback);
     sInstance        = this;
 
@@ -78,35 +77,49 @@ bool ReceiverRadioLink::begin(uint8_t wifiChannel, ControlCallback callback) {
     return true;
 }
 
-// ── Announcing ──────────────────────────────────────────────────────────
+// ── Channel management ──────────────────────────────────────────────────
 
-void ReceiverRadioLink::beginAnnouncing(const char *name, uint8_t modelType) {
-    if (!_ready)
-        return;
+bool ReceiverRadioLink::setChannel(uint8_t channel) {
+    _wifiChannel = channel;
+#ifdef NATIVE_SIM
+    sim_set_wifi_channel(channel);
+#else
+    esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+#endif
+    return true;
+}
 
+// ── Presence (replaces announcing) ──────────────────────────────────────
+
+void ReceiverRadioLink::configurePresence(const char *name, uint8_t modelType) {
     _modelType = modelType;
     std::memset(_vehicleName, 0, sizeof(_vehicleName));
     std::strncpy(_vehicleName, name, kVehicleNameMax - 1);
-
-    addPeer(kBroadcastMac);
-    _announcing     = true;
-    _lastAnnounceMs = 0;
 }
 
-void ReceiverRadioLink::tickAnnounce(uint32_t intervalMs) {
-    if (!_announcing)
+void ReceiverRadioLink::beginPresence() {
+    if (!_ready)
+        return;
+
+    addPeer(kBroadcastMac);
+    _presencing     = true;
+    _lastPresenceMs = 0;
+}
+
+void ReceiverRadioLink::tickPresence(uint32_t intervalMs) {
+    if (!_presencing)
         return;
 
     const uint32_t now = millis();
-    if ((now - _lastAnnounceMs) >= intervalMs) {
-        sendAnnounce();
-        _lastAnnounceMs = now;
+    if ((now - _lastPresenceMs) >= intervalMs) {
+        sendPresencePacket();
+        _lastPresenceMs = now;
     }
 }
 
-void ReceiverRadioLink::sendAnnounce() {
-    AnnouncePacket pkt{};
-    fillHeader(pkt, PacketType::Announce);
+void ReceiverRadioLink::sendPresencePacket() {
+    ReceiverPresencePacket pkt{};
+    fillHeader(pkt, PacketType::ReceiverPresence);
     pkt.model_type = _modelType;
     esp_read_mac(pkt.mac, ESP_MAC_WIFI_STA);
     std::strncpy(pkt.name, _vehicleName, kVehicleNameMax - 1);
@@ -116,15 +129,41 @@ void ReceiverRadioLink::sendAnnounce() {
     esp_now_send(kBroadcastMac, reinterpret_cast<uint8_t *>(&pkt), sizeof(pkt));
 }
 
-void ReceiverRadioLink::stopAnnouncing() {
-    _announcing = false;
+void ReceiverRadioLink::stopPresence() {
+    _presencing = false;
     delPeer(kBroadcastMac);
 }
 
-void ReceiverRadioLink::resumeAnnouncing() {
+void ReceiverRadioLink::resumePresence() {
     addPeer(kBroadcastMac);
-    _announcing     = true;
-    _lastAnnounceMs = 0;
+    _presencing     = true;
+    _lastPresenceMs = 0;
+}
+
+// ── Discovery ───────────────────────────────────────────────────────────
+
+bool ReceiverRadioLink::sendDiscoveryRequest() {
+    if (!_ready)
+        return false;
+
+    addPeer(kBroadcastMac);
+
+    DiscoveryRequestPacket pkt{};
+    fillHeader(pkt, PacketType::DiscoveryRequest);
+    esp_read_mac(pkt.mac, ESP_MAC_WIFI_STA);
+    pkt.role = static_cast<uint8_t>(DeviceRole::Receiver);
+    setChecksum(pkt);
+
+    auto rc = esp_now_send(kBroadcastMac, reinterpret_cast<uint8_t *>(&pkt), sizeof(pkt));
+    return rc == ESP_OK;
+}
+
+void ReceiverRadioLink::onDiscoveryResponse(DiscoveryResponseCallback cb) {
+    _discoveryResponseCallback = std::move(cb);
+}
+
+void ReceiverRadioLink::onChannelMigration(ChannelMigrationCallback cb) {
+    _channelMigrationCallback = std::move(cb);
 }
 
 // ── Telemetry ───────────────────────────────────────────────────────────
@@ -168,7 +207,7 @@ bool ReceiverRadioLink::checkLinkTimeout(uint32_t timeoutMs) {
         std::memset(_txMac, 0, sizeof(_txMac));
         _bound         = false;
         _lastControlMs = 0;
-        resumeAnnouncing();
+        resumePresence();
         return true;
     }
     return false;
@@ -195,7 +234,7 @@ void ReceiverRadioLink::handleReceive(const uint8_t * /*mac*/, const uint8_t *da
 
     const auto type = static_cast<PacketType>(data[3]);
 
-    // ── Bind request from transmitter (while announcing) ────────────
+    // ── Bind request from transmitter (while presencing) ────────────
     if (type == PacketType::Bind && !_bound) {
         if (len < static_cast<int>(sizeof(BindPacket)))
             return;
@@ -213,7 +252,7 @@ void ReceiverRadioLink::handleReceive(const uint8_t * /*mac*/, const uint8_t *da
         esp_now_send(_txMac, reinterpret_cast<uint8_t *>(&reply), sizeof(reply));
 
         _bound = true;
-        stopAnnouncing();
+        stopPresence();
         return;
     }
 
@@ -226,7 +265,7 @@ void ReceiverRadioLink::handleReceive(const uint8_t * /*mac*/, const uint8_t *da
         std::memset(_txMac, 0, sizeof(_txMac));
         _bound         = false;
         _lastControlMs = 0;
-        resumeAnnouncing();
+        resumePresence();
         return;
     }
 
@@ -243,6 +282,29 @@ void ReceiverRadioLink::handleReceive(const uint8_t * /*mac*/, const uint8_t *da
         if (_controlCallback) {
             _controlCallback(*cp);
         }
+        return;
+    }
+
+    // ── DiscoveryResponse (during channel scanning) ────────────
+    if (type == PacketType::DiscoveryResponse) {
+        if (len < static_cast<int>(sizeof(DiscoveryResponsePacket)))
+            return;
+        const auto *dp = reinterpret_cast<const DiscoveryResponsePacket *>(data);
+        if (_discoveryResponseCallback) {
+            _discoveryResponseCallback(dp->channel, sPromiscRssi, dp->device_count);
+        }
+        return;
+    }
+
+    // ── ChannelMigration (transmitter is switching channels) ───
+    if (type == PacketType::ChannelMigration) {
+        if (len < static_cast<int>(sizeof(ChannelMigrationPacket)))
+            return;
+        const auto *mp = reinterpret_cast<const ChannelMigrationPacket *>(data);
+        if (_channelMigrationCallback) {
+            _channelMigrationCallback(mp->new_channel);
+        }
+        return;
     }
 }
 

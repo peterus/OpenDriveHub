@@ -29,9 +29,13 @@ Import("env")
 import os
 
 sim_dir = os.path.abspath(os.path.join(env.subst("$PROJECT_DIR"), "sim"))
+lib_dir = os.path.abspath(os.path.join(env.subst("$PROJECT_DIR"), "lib"))
 
 # Add shim headers to the include path (highest priority).
 env.Prepend(CPPPATH=[os.path.join(sim_dir, "include")])
+
+# Add shared library headers needed by shim sources.
+env.Append(CPPPATH=[os.path.join(lib_dir, "odh-channel")])
 
 # Compile the shim source files as part of the build.
 env.BuildSources(

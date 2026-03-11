@@ -27,6 +27,7 @@
 #define SIM_WIFI_H
 
 #include "Arduino.h"
+#include "esp_now.h"
 
 #include <cstdint>
 
@@ -59,6 +60,9 @@ public:
     void softAPdisconnect(bool = false) {}
     IPAddress softAPIP() {
         return IPAddress();
+    }
+    uint8_t channel() {
+        return sim_get_wifi_channel();
     }
 };
 
