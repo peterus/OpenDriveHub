@@ -23,6 +23,7 @@
 
 #include "../TransmitterApp.h"
 
+#include <Channel.h>
 #include <Config.h>
 #include <FunctionMap.h>
 #include <NvsStore.h>
@@ -37,6 +38,63 @@
 #include <cstring>
 
 namespace odh {
+
+// ── Helper: print a NameView via shell ──────────────────────────────────
+
+static void printName(Shell &shell, const char *prefix, NameView name) {
+#ifdef ODH_HAS_STRING_VIEW
+    shell.println("%s%.*s", prefix, static_cast<int>(name.size()), name.data());
+#else
+    shell.println("%s%s", prefix, name);
+#endif
+}
+
+// ── Helper: parse model name to ModelType ───────────────────────────────
+
+static bool parseModel(const char *str, ModelType &out) {
+    for (uint8_t m = 0; m < static_cast<uint8_t>(ModelType::Count); ++m) {
+        auto mn = modelName(static_cast<ModelType>(m));
+#ifdef ODH_HAS_STRING_VIEW
+        bool match    = true;
+        const char *s = str;
+        for (size_t i = 0; i < mn.size(); ++i) {
+            if (*s == '\0' || (*s | 0x20) != (mn[i] | 0x20)) {
+                match = false;
+                break;
+            }
+            ++s;
+        }
+        if (match && *s == '\0') {
+            out = static_cast<ModelType>(m);
+            return true;
+        }
+#else
+        if (strcasecmp(str, mn) == 0) {
+            out = static_cast<ModelType>(m);
+            return true;
+        }
+#endif
+    }
+    return false;
+}
+
+// ── Helper: list available model names ──────────────────────────────────
+
+static void listModels(Shell &shell) {
+    shell.println("Available models:");
+    for (uint8_t m = 0; m < static_cast<uint8_t>(ModelType::Count); ++m) {
+        printName(shell, "  ", modelName(static_cast<ModelType>(m)));
+    }
+}
+
+// ── Helper: list available function names ───────────────────────────────
+
+static void listFunctions(Shell &shell) {
+    shell.println("Available functions:");
+    for (uint8_t f = 0; f <= static_cast<uint8_t>(Function::TrackR); ++f) {
+        printName(shell, "  ", functionName(f));
+    }
+}
 
 // ── status ──────────────────────────────────────────────────────────────
 
@@ -68,8 +126,16 @@ static int cmdBind(Shell &shell, int argc, const char *const *argv, void *ctx) {
     auto &app = *static_cast<TransmitterApp *>(ctx);
 
     if (argc < 2) {
-        shell.println("Usage: bind <scan|list|connect <n>>");
+        shell.println("Usage: bind <scan|list|connect <n>|help>");
         return 1;
+    }
+
+    if (strcmp(argv[1], "help") == 0) {
+        shell.println("bind sub-commands:");
+        shell.println("  scan        Start scanning for vehicles");
+        shell.println("  list        List discovered vehicles");
+        shell.println("  connect <n> Connect to vehicle by index");
+        return 0;
     }
 
     if (strcmp(argv[1], "scan") == 0) {
@@ -148,11 +214,11 @@ static int cmdChannel(Shell &shell, int argc, const char *const *argv, void *ctx
     auto &app = *static_cast<TransmitterApp *>(ctx);
 
     if (argc < 2) {
-        shell.println("Usage: channel <list|set <idx> <us>>");
+        shell.println("Usage: channel <get|set <idx> <us>>");
         return 1;
     }
 
-    if (strcmp(argv[1], "list") == 0) {
+    if (strcmp(argv[1], "get") == 0) {
         auto snap = app.snapshotFuncValues();
         for (uint8_t i = 0; i < snap.second; ++i) {
             auto fn = functionName(snap.first[i].function);
@@ -203,11 +269,11 @@ static int cmdTrim(Shell &shell, int argc, const char *const *argv, void *ctx) {
     auto &app = *static_cast<TransmitterApp *>(ctx);
 
     if (argc < 2) {
-        shell.println("Usage: trim <list|set <idx> <val>>");
+        shell.println("Usage: trim <get|set <idx> <val>>");
         return 1;
     }
 
-    if (strcmp(argv[1], "list") == 0) {
+    if (strcmp(argv[1], "get") == 0) {
         auto snap = app.snapshotFuncValues();
         for (uint8_t i = 0; i < snap.second; ++i) {
             auto fn = functionName(snap.first[i].function);
@@ -246,46 +312,101 @@ static int cmdTrim(Shell &shell, int argc, const char *const *argv, void *ctx) {
 // ── module ──────────────────────────────────────────────────────────────
 
 // cppcheck-suppress constParameterCallback
-static int cmdModule(Shell &shell, int, const char *const *, void *ctx) {
-    const auto &app = *static_cast<const TransmitterApp *>(ctx);
-
-    for (uint8_t s = 0; s < app.modules().slotCount(); ++s) {
-        const char *typeStr = "empty";
-        switch (app.modules().typeAt(s)) {
-        case ModuleType::Switch:
-            typeStr = "Switch";
-            break;
-        case ModuleType::Button:
-            typeStr = "Button";
-            break;
-        case ModuleType::Potentiometer:
-            typeStr = "Pot";
-            break;
-        case ModuleType::Encoder:
-            typeStr = "Encoder";
-            break;
-        default:
-            break;
-        }
-        shell.println("  Slot %u: %s (%u inputs)", s, typeStr, app.modules().inputCount(s));
+static int cmdModule(Shell &shell, int argc, const char *const *argv, void *ctx) {
+    if (argc < 2) {
+        shell.println("Usage: module <list>");
+        return 1;
     }
-    return 0;
+
+    if (strcmp(argv[1], "list") == 0) {
+        const auto &app = *static_cast<const TransmitterApp *>(ctx);
+        for (uint8_t s = 0; s < app.modules().slotCount(); ++s) {
+            const char *typeStr = "empty";
+            switch (app.modules().typeAt(s)) {
+            case ModuleType::Switch:
+                typeStr = "Switch";
+                break;
+            case ModuleType::Button:
+                typeStr = "Button";
+                break;
+            case ModuleType::Potentiometer:
+                typeStr = "Pot";
+                break;
+            case ModuleType::Encoder:
+                typeStr = "Encoder";
+                break;
+            default:
+                break;
+            }
+            shell.println("  Slot %u: %s (%u inputs)", s, typeStr, app.modules().inputCount(s));
+        }
+        return 0;
+    }
+
+    shell.println("Unknown sub-command: %s", argv[1]);
+    return 1;
+}
+
+// ── input ───────────────────────────────────────────────────────────────
+
+static int cmdInput(Shell &shell, int argc, const char *const *argv, void *ctx) {
+    auto &app = *static_cast<TransmitterApp *>(ctx);
+
+    if (argc < 2) {
+        shell.println("Usage: input <get|help|reset>");
+        return 1;
+    }
+
+    if (strcmp(argv[1], "get") == 0) {
+        auto snap = app.snapshotFuncValues();
+        if (snap.second == 0) {
+            shell.println("No input map configured");
+            return 0;
+        }
+        for (uint8_t i = 0; i < snap.second; ++i) {
+            auto fn = functionName(snap.first[i].function);
+#ifdef ODH_HAS_STRING_VIEW
+            shell.println("  [%u] %.*s  value %u us  trim %+d", i, static_cast<int>(fn.size()), fn.data(), snap.first[i].value, snap.first[i].trim);
+#else
+            shell.println("  [%u] %s  value %u us  trim %+d", i, fn, snap.first[i].value, snap.first[i].trim);
+#endif
+        }
+        return 0;
+    }
+
+    if (strcmp(argv[1], "help") == 0) {
+        listFunctions(shell);
+        return 0;
+    }
+
+    if (strcmp(argv[1], "reset") == 0) {
+        NvsStore nvs("odh", true);
+        uint8_t model = nvs.getU8("model_type", static_cast<uint8_t>(ModelType::Generic));
+        app.loadInputMapForModel(model);
+        shell.println("Input map reset to defaults");
+        return 0;
+    }
+
+    shell.println("Unknown sub-command: %s", argv[1]);
+    return 1;
 }
 
 // ── config ──────────────────────────────────────────────────────────────
 
 static int cmdConfig(Shell &shell, int argc, const char *const *argv, void *ctx) {
-    (void)ctx;
-
     if (argc < 2) {
-        shell.println("Usage: config <get|set>");
+        shell.println("Usage: config <get|set|help|reset>");
         return 1;
     }
 
+    // ── config get ──
     if (strcmp(argv[1], "get") == 0) {
         NvsStore nvs("odh", true);
-        shell.println("  radio_ch:  %u", nvs.getU8("radio_ch", config::kRadioWifiChannel));
-        shell.println("  model:     %u", nvs.getU8("model_type", static_cast<uint8_t>(ModelType::Generic)));
+        shell.println("  radio_ch:  %u", nvs.getU8("radio_ch", channel::kDefaultChannel));
+
+        uint8_t modelRaw = nvs.getU8("model_type", static_cast<uint8_t>(ModelType::Generic));
+        printName(shell, "  model:     ", modelName(modelRaw));
+
         shell.println("  tx_cells:  %u", nvs.getU8("tx_cells", 0));
         shell.println("  rx_cells:  %u", nvs.getU8("rx_cells", 0));
         String dn = nvs.getString("dev_name", "TX");
@@ -293,10 +414,33 @@ static int cmdConfig(Shell &shell, int argc, const char *const *argv, void *ctx)
         return 0;
     }
 
+    // ── config help ──
+    if (strcmp(argv[1], "help") == 0) {
+        shell.println("Available config keys:");
+        shell.println("  radio_ch   WiFi channel (1, 6, 11)");
+        shell.println("  model      Model type:");
+        for (uint8_t m = 0; m < static_cast<uint8_t>(ModelType::Count); ++m) {
+            printName(shell, "               ", modelName(static_cast<ModelType>(m)));
+        }
+        shell.println("  tx_cells   TX battery cells (0-6, 0=auto)");
+        shell.println("  rx_cells   RX battery cells (0-6, 0=auto)");
+        shell.println("  dev_name   Device name (max %u chars)", kVehicleNameMax - 1);
+        return 0;
+    }
+
+    // ── config reset ──
+    if (strcmp(argv[1], "reset") == 0) {
+        NvsStore nvs("odh", false);
+        nvs.raw().clear();
+        shell.println("Config reset – restart required");
+        return 0;
+    }
+
+    // ── config set ──
     if (strcmp(argv[1], "set") == 0) {
         if (argc < 4) {
             shell.println("Usage: config set <key> <value>");
-            shell.println("  Keys: radio_ch, tx_cells, rx_cells, dev_name");
+            shell.println("  Use 'config help' to see available keys");
             return 1;
         }
 
@@ -304,12 +448,26 @@ static int cmdConfig(Shell &shell, int argc, const char *const *argv, void *ctx)
 
         if (strcmp(argv[2], "radio_ch") == 0) {
             int ch = atoi(argv[3]);
-            if (ch < 1 || ch > 13) {
-                shell.println("Channel must be 1-13");
+            if (!channel::isValidChannel(static_cast<uint8_t>(ch))) {
+                shell.println("Invalid channel (valid: 1, 6, 11)");
                 return 1;
             }
             nvs.putU8("radio_ch", static_cast<uint8_t>(ch));
             shell.println("radio_ch = %d (restart required)", ch);
+            return 0;
+        }
+
+        if (strcmp(argv[2], "model") == 0) {
+            ModelType model;
+            if (!parseModel(argv[3], model)) {
+                shell.println("Unknown model: %s", argv[3]);
+                listModels(shell);
+                return 1;
+            }
+            nvs.putU8("model_type", static_cast<uint8_t>(model));
+            auto &app = *static_cast<TransmitterApp *>(ctx);
+            app.loadInputMapForModel(static_cast<uint8_t>(model));
+            printName(shell, "model = ", modelName(model));
             return 0;
         }
 
@@ -342,6 +500,7 @@ static int cmdConfig(Shell &shell, int argc, const char *const *argv, void *ctx)
         }
 
         shell.println("Unknown key: %s", argv[2]);
+        shell.println("  Use 'config help' to see available keys");
         return 1;
     }
 
@@ -349,16 +508,48 @@ static int cmdConfig(Shell &shell, int argc, const char *const *argv, void *ctx)
     return 1;
 }
 
+// ── rescan ──────────────────────────────────────────────────────────────
+
+// cppcheck-suppress constParameterCallback
+static int cmdRescan(Shell &shell, int, const char *const *, void *ctx) {
+    auto &app = *static_cast<TransmitterApp *>(ctx);
+    if (app.radio().isBound()) {
+        shell.println("Cannot rescan while connected – disconnect first");
+        return 1;
+    }
+    app.rescan();
+    shell.println("Channel rescan initiated");
+    return 0;
+}
+
+// ── reboot ──────────────────────────────────────────────────────────────
+
+// cppcheck-suppress constParameterCallback
+static int cmdReboot(Shell &shell, int, const char *const *, void *) {
+#ifdef NATIVE_SIM
+    shell.println("Reboot not available in simulation");
+    return 1;
+#else
+    shell.println("Rebooting...");
+    delay(100);
+    ESP.restart();
+    return 0; // unreachable
+#endif
+}
+
 // ── Registration ────────────────────────────────────────────────────────
 
 void registerTransmitterShellCommands(Shell &shell, TransmitterApp &app) {
     shell.registerCommand("status", "Show link, battery and telemetry", cmdStatus, &app);
-    shell.registerCommand("bind", "Bind ops: scan, list, connect <n>", cmdBind, &app);
+    shell.registerCommand("bind", "Bind: scan, list, connect <n>, help", cmdBind, &app);
     shell.registerCommand("disconnect", "Disconnect from vehicle", cmdDisconnect, &app);
-    shell.registerCommand("channel", "Channel ops: list, set <idx> <us>", cmdChannel, &app);
-    shell.registerCommand("trim", "Trim ops: list, set <idx> <val>", cmdTrim, &app);
-    shell.registerCommand("module", "List detected input modules", cmdModule, &app);
-    shell.registerCommand("config", "Config ops: get, set <key> <val>", cmdConfig, &app);
+    shell.registerCommand("channel", "Channel: get, set <idx> <us>", cmdChannel, &app);
+    shell.registerCommand("trim", "Trim: get, set <idx> <val>", cmdTrim, &app);
+    shell.registerCommand("module", "Module: list", cmdModule, &app);
+    shell.registerCommand("input", "Input map: get, help, reset", cmdInput, &app);
+    shell.registerCommand("config", "Config: get, set, help, reset", cmdConfig, &app);
+    shell.registerCommand("rescan", "Rescan WiFi channels", cmdRescan, &app);
+    shell.registerCommand("reboot", "Restart the device", cmdReboot, nullptr);
 }
 
 } // namespace odh

@@ -63,17 +63,17 @@ class TestDisconnect:
 class TestTrim:
     """Verify ``trim`` subcommands."""
 
-    def test_trim_list(self, console: Console) -> None:
-        """``trim list`` must return formatted output."""
-        output = console.send_command("trim list")
-        assert len(output.strip()) > 0, "trim list returned empty output"
+    def test_trim_get(self, console: Console) -> None:
+        """``trim get`` must return formatted output."""
+        output = console.send_command("trim get")
+        assert len(output.strip()) > 0, "trim get returned empty output"
 
     def test_trim_set_get_roundtrip(self, console: Console) -> None:
-        """Set trim, verify it appears in ``trim list``."""
+        """Set trim, verify it appears in ``trim get``."""
         console.send_command("trim set 0 50")
-        output = console.send_command("trim list")
+        output = console.send_command("trim get")
         assert "50" in output, (
-            f"trim value 50 not found in trim list:\n{output}"
+            f"trim value 50 not found in trim get:\n{output}"
         )
         # Reset trim
         console.send_command("trim set 0 0")
@@ -88,11 +88,96 @@ class TestTrim:
 
 
 class TestModule:
-    """Verify ``module`` command."""
+    """Verify ``module list`` command."""
 
     def test_module_list(self, console: Console) -> None:
-        """``module`` must return output (may report no modules in sim)."""
-        output = console.send_command("module")
+        """``module list`` must return output (may report no modules in sim)."""
+        output = console.send_command("module list")
         assert "error" not in output.lower(), (
-            f"module returned error:\n{output}"
+            f"module list returned error:\n{output}"
+        )
+
+    def test_module_no_subcommand(self, console: Console) -> None:
+        """``module`` without subcommand must show usage."""
+        output = console.send_command("module")
+        out_lower = output.lower()
+        assert "usage" in out_lower or "list" in out_lower, (
+            f"Expected usage hint for module without subcommand:\n{output}"
+        )
+
+
+class TestInput:
+    """Verify ``input`` command for input map management."""
+
+    def test_input_get(self, console: Console) -> None:
+        """``input get`` must not crash (may be empty if no map)."""
+        output = console.send_command("input get")
+        assert "error" not in output.lower(), (
+            f"input get returned error:\n{output}"
+        )
+
+    def test_input_help(self, console: Console) -> None:
+        """``input help`` must list available functions."""
+        output = console.send_command("input help")
+        out_lower = output.lower()
+        assert "drive" in out_lower, (
+            f"input help missing 'Drive' function:\n{output}"
+        )
+        assert "steering" in out_lower, (
+            f"input help missing 'Steering' function:\n{output}"
+        )
+
+    def test_input_reset(self, console: Console) -> None:
+        """``input reset`` must succeed without error."""
+        output = console.send_command("input reset")
+        out_lower = output.lower()
+        assert "error" not in out_lower and "unknown" not in out_lower, (
+            f"input reset failed:\n{output}"
+        )
+
+    def test_input_no_subcommand(self, console: Console) -> None:
+        """``input`` without subcommand must show usage."""
+        output = console.send_command("input")
+        out_lower = output.lower()
+        assert "usage" in out_lower or "get" in out_lower, (
+            f"Expected usage hint:\n{output}"
+        )
+
+
+class TestRescan:
+    """Verify ``rescan`` command."""
+
+    def test_rescan(self, console: Console) -> None:
+        """``rescan`` must not crash."""
+        output = console.send_command("rescan")
+        assert "error" not in output.lower(), (
+            f"rescan returned error:\n{output}"
+        )
+
+
+class TestTrimGetNotList:
+    """Verify old ``trim list`` syntax is rejected."""
+
+    def test_trim_list_rejected(self, console: Console) -> None:
+        output = console.send_command("trim list")
+        out_lower = output.lower()
+        assert "unknown" in out_lower or "usage" in out_lower or "error" in out_lower, (
+            f"Expected error for old 'trim list' syntax:\n{output}"
+        )
+
+
+class TestBindHelp:
+    """Verify ``bind help`` shows sub-commands."""
+
+    def test_bind_help(self, console: Console) -> None:
+        output = console.send_command("bind help")
+        out_lower = output.lower()
+        assert "scan" in out_lower, (
+            f"bind help missing 'scan':\n{output}"
+        )
+        assert "list" in out_lower, (
+            f"bind help missing 'list':\n{output}"
+        )
+        assert "connect" in out_lower, (
+            f"bind help missing 'connect':\n{output}"
         )

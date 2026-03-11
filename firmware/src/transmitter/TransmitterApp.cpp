@@ -35,8 +35,8 @@
 #include <FunctionMap.h>
 #include <NvsStore.h>
 #include <Protocol.h>
-#include <cstdlib>
 #include <Shell.h>
+#include <cstdlib>
 
 #ifdef NATIVE_SIM
 #include <WiFi.h>

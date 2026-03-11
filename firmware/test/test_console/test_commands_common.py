@@ -135,12 +135,12 @@ class TestConfigRoundtrip:
         console.send_command("config set tx_cells 0")
 
 
-class TestChannelList:
-    """Verify ``channel list`` shows channel information."""
+class TestChannelGet:
+    """Verify ``channel get`` shows channel information."""
 
-    def test_channel_list_returns_output(self, console: Console) -> None:
-        output = console.send_command("channel list")
-        assert len(output.strip()) > 0, "channel list returned empty output"
+    def test_channel_get_returns_output(self, console: Console) -> None:
+        output = console.send_command("channel get")
+        assert len(output.strip()) > 0, "channel get returned empty output"
 
 
 class TestMultipleCommands:
@@ -148,7 +148,7 @@ class TestMultipleCommands:
 
     def test_sequential_commands(self, console: Console) -> None:
         """Run 5 different commands and ensure all return valid output."""
-        commands = ["help", "status", "config get", "channel list", "help"]
+        commands = ["help", "status", "config get", "channel get", "help"]
         for cmd in commands:
             output = console.send_command(cmd)
             assert len(output.strip()) > 0, (
@@ -157,3 +157,113 @@ class TestMultipleCommands:
             assert "error" not in output.lower() or cmd == "config set", (
                 f"Command {cmd!r} produced error:\n{output}"
             )
+
+
+class TestConfigHelp:
+    """Verify ``config help`` lists available keys with value ranges."""
+
+    def test_config_help_returns_output(self, console: Console) -> None:
+        output = console.send_command("config help")
+        assert len(output.strip()) > 0, "config help returned empty output"
+
+    def test_config_help_lists_radio_ch(self, console: Console) -> None:
+        output = console.send_command("config help")
+        assert "radio_ch" in output, (
+            f"config help missing radio_ch:\n{output}"
+        )
+
+    def test_config_help_lists_model(self, console: Console) -> None:
+        output = console.send_command("config help")
+        assert "model" in output.lower(), (
+            f"config help missing model:\n{output}"
+        )
+
+    def test_config_help_shows_valid_channels(self, console: Console) -> None:
+        """``config help`` must mention valid WiFi channels."""
+        output = console.send_command("config help")
+        assert "1" in output and "6" in output and "11" in output, (
+            f"config help missing valid channel values:\n{output}"
+        )
+
+
+class TestConfigReset:
+    """Verify ``config reset`` works without error."""
+
+    def test_config_reset(self, console: Console) -> None:
+        output = console.send_command("config reset")
+        out_lower = output.lower()
+        assert "error" not in out_lower and "unknown" not in out_lower, (
+            f"config reset failed:\n{output}"
+        )
+
+
+class TestConfigSetRadioCh:
+    """Verify ``config set radio_ch`` validates channels."""
+
+    def test_config_set_radio_ch_invalid(self, console: Console) -> None:
+        """Setting radio_ch to 3 (not 1/6/11) must fail."""
+        output = console.send_command("config set radio_ch 3")
+        out_lower = output.lower()
+        assert "invalid" in out_lower or "error" in out_lower, (
+            f"Expected error for invalid channel 3:\n{output}"
+        )
+
+    def test_config_set_radio_ch_valid(self, console: Console) -> None:
+        """Setting radio_ch to 6 must succeed."""
+        output = console.send_command("config set radio_ch 6")
+        out_lower = output.lower()
+        assert "error" not in out_lower and "invalid" not in out_lower, (
+            f"Valid channel 6 was rejected:\n{output}"
+        )
+        result = console.send_command("config get")
+        assert "6" in result, (
+            f"radio_ch not set to 6:\n{result}"
+        )
+        # Reset to default
+        console.send_command("config set radio_ch 1")
+
+
+class TestConfigSetModel:
+    """Verify ``config set model`` works."""
+
+    def test_config_set_model_valid(self, console: Console) -> None:
+        """Setting model to a valid type must succeed."""
+        output = console.send_command("config set model Generic")
+        out_lower = output.lower()
+        assert "error" not in out_lower and "unknown" not in out_lower, (
+            f"Valid model was rejected:\n{output}"
+        )
+
+    def test_config_set_model_invalid(self, console: Console) -> None:
+        """Setting an invalid model must fail and list available models."""
+        output = console.send_command("config set model spaceship")
+        out_lower = output.lower()
+        assert "unknown" in out_lower or "invalid" in out_lower or "error" in out_lower, (
+            f"Expected error for invalid model:\n{output}"
+        )
+        assert "generic" in out_lower, (
+            f"Expected available models to be listed:\n{output}"
+        )
+
+
+class TestChannelGetNotList:
+    """Verify old ``channel list`` syntax is rejected."""
+
+    def test_channel_list_rejected(self, console: Console) -> None:
+        output = console.send_command("channel list")
+        out_lower = output.lower()
+        assert "unknown" in out_lower or "usage" in out_lower or "error" in out_lower, (
+            f"Expected error for old 'channel list' syntax:\n{output}"
+        )
+
+
+class TestReboot:
+    """Verify ``reboot`` in simulation."""
+
+    @pytest.mark.sim_only
+    def test_reboot_not_available_in_sim(self, console: Console) -> None:
+        output = console.send_command("reboot")
+        out_lower = output.lower()
+        assert "not available" in out_lower or "simulation" in out_lower, (
+            f"Expected 'not available in simulation':\n{output}"
+        )
