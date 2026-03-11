@@ -41,6 +41,7 @@
 #include "OdhWebServer.h"
 #include "OutputManager.h"
 #include "ReceiverRadioLink.h"
+#include "Shell.h"
 #include "web/ReceiverApi.h"
 
 #include <ChannelScanner.h>
@@ -58,12 +59,35 @@ public:
     /// Initialise all subsystems and start FreeRTOS tasks.
     void begin();
 
+    // ── Accessors for shell commands ────────────────────────────────
+
+    OutputManager &output() {
+        return _output;
+    }
+    const OutputManager &output() const {
+        return _output;
+    }
+    ReceiverRadioLink &radio() {
+        return _radio;
+    }
+    const ReceiverRadioLink &radio() const {
+        return _radio;
+    }
+    const BatteryMonitor &battery() const {
+        return _battery;
+    }
+    const char *vehicleName() const {
+        return _vehicleName;
+    }
+    void setVehicleName(const char *name);
+
 private:
     OutputManager _output;
     ReceiverRadioLink _radio;
     BatteryMonitor _battery;
     OdhWebServer _webServer;
     ReceiverApi _api;
+    Shell _shell;
 
     SemaphoreHandle_t _channelsMux = nullptr;
     bool _failsafeActive           = false;
@@ -84,10 +108,12 @@ private:
     static void taskOutputFn(void *param);
     static void taskTelemetryFn(void *param);
     static void taskWebFn(void *param);
+    static void taskShellFn(void *param);
 
     void runOutputLoop();
     void runTelemetryLoop();
     void runWebLoop();
+    void runShellLoop();
 
     // Channel discovery methods.
     void runChannelDiscovery();

@@ -36,6 +36,7 @@
 #include <NvsStore.h>
 #include <Protocol.h>
 #include <cstdlib>
+#include <Shell.h>
 
 #ifdef NATIVE_SIM
 #include <WiFi.h>
@@ -44,7 +45,11 @@
 #endif
 
 #include <freertos/task.h>
+#ifndef ODH_HEADLESS
 #include <lvgl.h>
+#endif
+
+#include "shell/TransmitterShellCommands.h"
 
 namespace odh {
 
@@ -106,10 +111,14 @@ void TransmitterApp::begin() {
     Wire.setClock(config::kI2cFreqHz);
 
     // Display
+#ifndef ODH_HEADLESS
     if (_display.begin())
         Serial.println(F("[ODH] Display + touch OK"));
     else
         Serial.println(F("[ODH] Display not found – continuing without it"));
+#else
+    Serial.println(F("[ODH] Headless mode – display disabled"));
+#endif
 
     // Backplane
     if (_backplane.begin())
@@ -180,9 +189,15 @@ void TransmitterApp::begin() {
     // Start FreeRTOS tasks
     xTaskCreatePinnedToCore(taskControl, "control", config::tx::kTaskControlStackWords, this, config::tx::kTaskControlPriority, nullptr, config::tx::kTaskControlCore);
 
+#ifndef ODH_HEADLESS
     xTaskCreatePinnedToCore(taskDisplay, "display", config::tx::kTaskDisplayStackWords, this, config::tx::kTaskDisplayPriority, nullptr, config::tx::kTaskDisplayCore);
+#endif
 
     xTaskCreatePinnedToCore(taskWeb, "webconfig", config::tx::kTaskWebConfigStackWords, this, config::tx::kTaskWebConfigPriority, nullptr, config::tx::kTaskWebConfigCore);
+
+    // Shell console
+    registerTransmitterShellCommands(_shell, *this);
+    xTaskCreatePinnedToCore(taskShell, "shell", config::kShellTaskStackWords, this, config::kShellTaskPriority, nullptr, config::kShellTaskCore);
 
     Serial.println(F("[ODH] Setup complete"));
 }
@@ -391,6 +406,8 @@ void TransmitterApp::taskControl(void *param) {
 
 /* ── taskDisplay – 4 Hz ──────────────────────────────────────────────────── */
 
+#ifndef ODH_HEADLESS
+
 void TransmitterApp::taskDisplay(void *param) {
     auto &app               = *static_cast<TransmitterApp *>(param);
     TickType_t lastTickTime = xTaskGetTickCount();
@@ -482,6 +499,82 @@ void TransmitterApp::taskDisplay(void *param) {
 
         vTaskDelay(pdMS_TO_TICKS(config::tx::kDisplayRefreshIntervalMs));
     }
+}
+
+#endif // ODH_HEADLESS
+
+/* ── taskShell ───────────────────────────────────────────────────────────── */
+
+void TransmitterApp::taskShell(void *param) {
+    auto &app = *static_cast<TransmitterApp *>(param);
+
+#ifdef ODH_HEADLESS
+    // In headless mode the shell task also handles telemetry timeout and
+    // RX cell auto-detection that normally live in taskDisplay.
+    bool rxCellsDetected = false;
+#endif
+
+    for (;;) {
+        app._shell.poll();
+
+#ifdef ODH_HEADLESS
+        // Telemetry timeout → auto-disconnect
+        if (app._radio.isBound() && app._telemetry.hasData() && app._telemetry.msSinceLastPacket() > config::kRadioLinkTimeoutMs) {
+            Serial.println(F("[ODH] Telemetry timeout – disconnecting"));
+            app._radio.disconnect();
+        }
+
+        // Auto-detect RX cells
+        if (app._radio.isBound() && app._telemetry.hasData() && !rxCellsDetected) {
+            if (app._telemetry.rxCells() == 0) {
+                app._telemetry.autoDetectRxCells();
+            }
+            rxCellsDetected = true;
+        }
+        if (!app._radio.isBound())
+            rxCellsDetected = false;
+
+        // Prune stale vehicles while scanning
+        if (app._radio.isScanning()) {
+            app._radio.pruneStaleVehicles(config::tx::kVehicleDiscoveryTimeoutMs);
+        }
+#endif
+
+        vTaskDelay(pdMS_TO_TICKS(config::kShellPollIntervalMs));
+    }
+}
+
+/* ── Accessors ───────────────────────────────────────────────────────────── */
+
+std::pair<const FunctionValue *, uint8_t> TransmitterApp::snapshotFuncValues() {
+    uint8_t count = 0;
+    if (xSemaphoreTake(_funcMux, pdMS_TO_TICKS(10)) == pdTRUE) {
+        count = _funcValueCount;
+        memcpy(_snapBuf, _funcValues, count * sizeof(FunctionValue));
+        xSemaphoreGive(_funcMux);
+    }
+    return {_snapBuf, count};
+}
+
+bool TransmitterApp::setTrim(uint8_t idx, int8_t value) {
+    if (idx >= _inputMapCount)
+        return false;
+
+    if (xSemaphoreTake(_funcMux, pdMS_TO_TICKS(10)) == pdTRUE) {
+        _inputMap[idx].trim = value;
+        if (idx < _funcValueCount)
+            _funcValues[idx].trim = value;
+        xSemaphoreGive(_funcMux);
+    }
+
+    // Persist
+    NvsStore nvs("odh", false);
+    NvsStore nvsr("odh", true);
+    uint8_t m = nvsr.getU8("model_type", static_cast<uint8_t>(ModelType::Generic));
+    char ek[16];
+    snprintf(ek, sizeof(ek), "imape_%u", m);
+    nvs.putBytes(ek, _inputMap, _inputMapCount * sizeof(InputAssignment));
+    return true;
 }
 
 /* ── taskWeb ─────────────────────────────────────────────────────────────── */

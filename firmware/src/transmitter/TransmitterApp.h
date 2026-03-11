@@ -23,18 +23,21 @@
  * TransmitterApp – top-level application class for the transmitter.
  *
  * Owns all subsystems: Backplane, ModuleManager, RadioLink, BatteryMonitor,
- * TelemetryData, Display, OdhWebServer, TransmitterApi.
+ * TelemetryData, Display, OdhWebServer, TransmitterApi, Shell.
  *
- * Creates three FreeRTOS tasks:
+ * Creates FreeRTOS tasks:
  *   taskControl  – core 1, 50 Hz: read modules, send control packets
- *   taskDisplay  – core 0, 4 Hz : LVGL refresh, touch events
+ *   taskDisplay  – core 0, 4 Hz : LVGL refresh, touch events (not in headless)
+ *   taskShell    – core 0       : interactive console
  *   taskWeb      – core 0, low  : web config server
  */
 
 #pragma once
 
 #include "backplane/Backplane.h"
+#ifndef ODH_HEADLESS
 #include "display/Display.h"
+#endif
 #include "modules/InputMap.h"
 #include "modules/ModuleManager.h"
 #include "web/TransmitterApi.h"
@@ -43,10 +46,12 @@
 #include <ChannelScanner.h>
 #include <Config.h>
 #include <OdhWebServer.h>
+#include <Shell.h>
 #include <TelemetryData.h>
 #include <TransmitterRadioLink.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include <utility>
 
 namespace odh {
 
@@ -57,6 +62,38 @@ public:
     /// Rescan channels for other transmitters. Only callable when not bound.
     void rescan();
 
+    // ── Accessors for shell commands ────────────────────────────────
+
+    TransmitterRadioLink &radio() {
+        return _radio;
+    }
+    const TransmitterRadioLink &radio() const {
+        return _radio;
+    }
+    const BatteryMonitor &battery() const {
+        return _battery;
+    }
+    TelemetryData &telemetry() {
+        return _telemetry;
+    }
+    const TelemetryData &telemetry() const {
+        return _telemetry;
+    }
+    const ModuleManager &modules() const {
+        return _modules;
+    }
+
+    /// Snapshot of current function values (thread-safe copy).
+    std::pair<const FunctionValue *, uint8_t> snapshotFuncValues();
+
+    /// Set trim for a function index.  Returns false if out of range.
+    bool setTrim(uint8_t idx, int8_t value);
+
+    /// Load input map for a model type (used by shell bind command).
+    void loadInputMapForModel(uint8_t model) {
+        loadInputMap(model);
+    }
+
 private:
     // Subsystems
     Backplane _backplane{config::tx::kI2cMuxAddr, config::tx::kModuleSlotCount};
@@ -64,9 +101,12 @@ private:
     TransmitterRadioLink _radio;
     BatteryMonitor _battery{config::kBatteryAdcPin, config::kBatteryDividerRatio, config::kAdcVrefMv, config::kAdcResolutionBits};
     TelemetryData _telemetry;
+#ifndef ODH_HEADLESS
     Display _display;
+#endif
     OdhWebServer _webServer;
     TransmitterApi _api{_webServer, _radio, _battery, _telemetry, _modules};
+    Shell _shell;
 
     // Input map (per current model)
     InputAssignment _inputMap[kMaxFunctions] = {};
@@ -75,6 +115,7 @@ private:
     // Function values built each control cycle
     FunctionValue _funcValues[kMaxFunctions] = {};
     uint8_t _funcValueCount                  = 0;
+    FunctionValue _snapBuf[kMaxFunctions]    = {};
 
     SemaphoreHandle_t _i2cMutex = nullptr;
     SemaphoreHandle_t _funcMux  = nullptr;
@@ -94,7 +135,10 @@ private:
 
     // FreeRTOS task bodies
     static void taskControl(void *param);
+#ifndef ODH_HEADLESS
     static void taskDisplay(void *param);
+#endif
+    static void taskShell(void *param);
     static void taskWeb(void *param);
 };
 

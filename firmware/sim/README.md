@@ -1,6 +1,6 @@
 # Simulation
 
-OpenDriveHub includes two simulation environments that build the full
+OpenDriveHub includes three simulation environments that build the full
 firmware as **Linux executables**.  No ESP32 hardware is required.
 
 ---
@@ -10,7 +10,7 @@ firmware as **Linux executables**.  No ESP32 hardware is required.
 ### Prerequisites
 
 ```bash
-# SDL2 is needed only for the transmitter simulation (display window)
+# SDL2 is needed only for the sim_tx_gui environment (display window)
 sudo apt install pkg-config libsdl2-dev
 ```
 
@@ -22,8 +22,11 @@ cd firmware
 # Receiver simulation (terminal-only, no display)
 pio run -e sim_rx -t exec
 
-# Transmitter simulation (opens an SDL2 window)
+# Transmitter simulation (headless terminal, no display)
 pio run -e sim_tx -t exec
+
+# Transmitter simulation with SDL2 GUI (opens a window)
+pio run -e sim_tx_gui -t exec
 ```
 
 Open both in separate terminals to simulate a complete TX → RX link.
@@ -43,12 +46,12 @@ Source files live in `firmware/sim/`.
 | ADS1115 | `Adafruit_ADS1X15.h` | (header-only stub) | Returns constant mid-value |
 | PCF8574 | `Adafruit_PCF8574.h` | (header-only stub) | Returns 0xFF (all high) |
 | Preferences (NVS) | `Preferences.h` | `sim_preferences.cpp` | In-memory key-value map |
-| ILI9341 + LVGL | `TFT_eSPI.h` | (linked SDL2) | SDL2 window (sim_tx only) |
+| ILI9341 + LVGL | `TFT_eSPI.h` | (linked SDL2) | SDL2 window (sim_tx_gui only) |
 | WiFi AP | `WiFi.h` | `sim_wifi.cpp` | No-op (AP name printed) |
 | ESPAsyncWebServer | `ESPAsyncWebServer.h` | `sim_webserver.cpp` | Localhost HTTP |
 | LittleFS | `LittleFS.h` | (header-only stub) | No-op |
 | Arduino core | `Arduino.h` | `sim_arduino.cpp` | `millis()`, `delay()`, `Serial` |
-| Keyboard input | `sim_keyboard.h` | `sim_keyboard.cpp` | SDL2 key events (sim_tx) |
+| Keyboard input | `sim_keyboard.h` | `sim_keyboard.cpp` | SDL2 key events (sim_tx_gui) |
 
 ---
 
@@ -56,15 +59,17 @@ Source files live in `firmware/sim/`.
 
 1. Start `sim_rx` — it immediately begins broadcasting `AnnouncePacket` via
    UDP.
-2. Start `sim_tx` — an SDL2 window appears showing the scan screen.
+2. Start `sim_tx` — the transmitter runs in headless mode in the terminal.
+   Alternatively, start `sim_tx_gui` — an SDL2 window appears showing the scan screen.
 3. After a few seconds the receiver's vehicle name appears on screen.
-4. Click the vehicle button in the SDL2 window to bind.
+4. Click the vehicle button in the SDL2 window to bind (sim_tx_gui), or the
+   transmitter auto-connects in headless mode (sim_tx).
 5. Both sides enter **Connected** state.  Control packets flow TX → RX;
    telemetry flows RX → TX.
 
 ---
 
-## Keyboard Shortcuts (sim_tx)
+## Keyboard Shortcuts (sim_tx_gui)
 
 The transmitter simulation accepts keyboard input to control function values
 instead of physical modules.
@@ -87,6 +92,7 @@ Both environments start a local HTTP server:
 | Environment | URL | Port |
 |-------------|-----|------|
 | sim_tx | http://localhost:8080 | 8080 |
+| sim_tx_gui | http://localhost:8080 | 8080 |
 | sim_rx | http://localhost:8081 | 8081 |
 
 > **Note:** Static files (HTML/CSS/JS) are **not** served in simulation
@@ -119,7 +125,7 @@ build script (`firmware/sim/sim_build.py`) adds:
 
 - `-I firmware/sim/include` (shim headers)
 - Linking of shim `.cpp` sources
-- SDL2 flags via `pkg-config` (sim_tx only)
+- SDL2 flags via `pkg-config` (sim_tx_gui only)
 - `-DNATIVE_SIM` preprocessor define
 
 ---

@@ -368,6 +368,20 @@ extern void test_scanner_no_response(void);
 extern void test_scanner_with_response(void);
 extern void test_scanner_best_channel_with_transmitter(void);
 extern void test_scanner_best_channel_no_transmitter(void);
+/* Shell tokenizer tests (test_shell.cpp) */
+extern void test_tokenize_single_word(void);
+extern void test_tokenize_two_words(void);
+extern void test_tokenize_three_args(void);
+extern void test_tokenize_leading_spaces(void);
+extern void test_tokenize_trailing_spaces(void);
+extern void test_tokenize_multiple_spaces(void);
+extern void test_tokenize_tabs(void);
+extern void test_tokenize_empty_string(void);
+extern void test_tokenize_only_spaces(void);
+extern void test_tokenize_max_args_limit(void);
+extern void test_tokenize_quoted_string(void);
+extern void test_tokenize_quoted_with_extra_args(void);
+extern void test_tokenize_empty_quotes(void);
 
 int main(int argc, char **argv) {
     (void)argc;
@@ -528,6 +542,20 @@ int main(int argc, char **argv) {
     RUN_TEST(test_scanner_with_response);
     RUN_TEST(test_scanner_best_channel_with_transmitter);
     RUN_TEST(test_scanner_best_channel_no_transmitter);
+    /* Shell tokenizer tests */
+    RUN_TEST(test_tokenize_single_word);
+    RUN_TEST(test_tokenize_two_words);
+    RUN_TEST(test_tokenize_three_args);
+    RUN_TEST(test_tokenize_leading_spaces);
+    RUN_TEST(test_tokenize_trailing_spaces);
+    RUN_TEST(test_tokenize_multiple_spaces);
+    RUN_TEST(test_tokenize_tabs);
+    RUN_TEST(test_tokenize_empty_string);
+    RUN_TEST(test_tokenize_only_spaces);
+    RUN_TEST(test_tokenize_max_args_limit);
+    RUN_TEST(test_tokenize_quoted_string);
+    RUN_TEST(test_tokenize_quoted_with_extra_args);
+    RUN_TEST(test_tokenize_empty_quotes);
 
     return UNITY_END();
 }
