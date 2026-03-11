@@ -242,7 +242,7 @@ See `firmware/sim/README.md` for keyboard shortcuts and known limitations.
 
 ## Build Environments
 
-The unified `firmwave/platformio.ini` defines six environments:
+The unified `firmware/platformio.ini` defines six environments:
 
 | Environment | Target | Board | Framework |
 |-------------|--------|-------|-----------|
