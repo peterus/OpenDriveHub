@@ -65,6 +65,16 @@ inline constexpr float kBatteryDividerRatio = 4.03f;
 inline constexpr uint16_t kAdcVrefMv        = 3300;
 inline constexpr uint8_t kAdcResolutionBits = 12;
 
+// ── Shell console ───────────────────────────────────────────────────────
+
+/// Shell poll interval (ms) – how often the shell task checks for input.
+inline constexpr uint32_t kShellPollIntervalMs = 50;
+
+/// FreeRTOS task config for the shell task.
+inline constexpr uint32_t kShellTaskStackWords = 4096;
+inline constexpr uint8_t kShellTaskPriority    = 1;
+inline constexpr uint8_t kShellTaskCore        = 0;
+
 // ── Receiver-specific settings ──────────────────────────────────────────
 
 namespace rx {
