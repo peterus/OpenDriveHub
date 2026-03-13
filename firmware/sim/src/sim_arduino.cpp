@@ -166,12 +166,29 @@ int analogRead(uint8_t) {
 
 /* ── MAC address ────────────────────────────────────────────────────────── */
 
+/// Generate a per-process unique MAC address so that multiple simulation
+/// instances of the same role (e.g. two sim_tx) are distinguishable.
+/// The last two bytes are derived from the process ID.
 void esp_read_mac(uint8_t *mac, esp_mac_type_t) {
+    static uint8_t fakeMac[6] = {};
+    static bool initialised   = false;
+    if (!initialised) {
+        uint16_t pid = static_cast<uint16_t>(getpid());
 #ifdef SIM_TX
-    static const uint8_t fakeMac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0x01, 0x01};
+        fakeMac[0] = 0xAA;
+        fakeMac[1] = 0xBB;
+        fakeMac[2] = 0xCC;
+        fakeMac[3] = 0xDD;
 #else
-    static const uint8_t fakeMac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0x02, 0x01};
+        fakeMac[0] = 0xAA;
+        fakeMac[1] = 0xBB;
+        fakeMac[2] = 0xCC;
+        fakeMac[3] = 0xDE;
 #endif
+        fakeMac[4]  = static_cast<uint8_t>(pid >> 8);
+        fakeMac[5]  = static_cast<uint8_t>(pid & 0xFF);
+        initialised = true;
+    }
     memcpy(mac, fakeMac, 6);
 }
 
