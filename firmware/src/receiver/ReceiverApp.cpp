@@ -232,8 +232,16 @@ void ReceiverApp::runChannelDiscovery() {
     // Wire up the ChannelScanner callbacks to our radio layer
     ChannelScanner scanner([this](uint8_t ch) -> bool { return _radio.setChannel(ch); }, [this](uint8_t /*ch*/) -> bool { return _radio.sendDiscoveryRequest(); }, [](uint32_t ms) { delay(ms); });
 
-    // Forward DiscoveryResponse to the scanner
+    // Forward DiscoveryResponse to the scanner.
+    // The RAII guard below clears this callback when the function returns,
+    // preventing a dangling reference to the stack-local scanner.
     _radio.onDiscoveryResponse([&scanner](uint8_t ch, int8_t rssi, uint8_t devCount) { scanner.onDiscoveryResponse(ch, rssi, devCount); });
+    struct DiscoveryResponseGuard {
+        ReceiverRadioLink &radio;
+        ~DiscoveryResponseGuard() {
+            radio.onDiscoveryResponse(nullptr);
+        }
+    } cbGuard{_radio};
 
     // Step 1: Try last known channel from NVS
     uint8_t lastCh = loadChannel();

@@ -20,10 +20,18 @@
  */
 
 /**
- * sim_espnow.cpp – ESP-NOW over UDP sockets.
+ * sim_espnow.cpp – ESP-NOW over UDP multicast sockets.
  *
- * Each WiFi channel maps to a shared UDP port (port = 7000 + channel).
- * All devices on the same channel listen and send on the same port.
+ * Each WiFi channel maps to a UDP multicast group and port:
+ *   channel 1  → 239.0.0.1:7001
+ *   channel 6  → 239.0.0.6:7006
+ *   channel 11 → 239.0.0.11:7011
+ *
+ * Using multicast ensures that every process on the same channel receives
+ * every packet (fan-out), unlike SO_REUSEPORT unicast which only delivers
+ * to one socket.  The receive thread is stopped and restarted whenever the
+ * channel changes so the socket is never accessed concurrently with rebind.
+ *
  * Packets include a 6-byte source MAC header prepended to the original
  * payload so the receive callback gets the sender's address.
  * Self-packets are filtered by comparing the source MAC.
@@ -61,6 +69,15 @@ static std::mutex s_peerMutex;
 static uint8_t s_localMac[6]    = {};
 static uint8_t s_currentChannel = 1;
 
+/* ── Multicast helper ───────────────────────────────────────────────────── */
+
+/// Returns the multicast group IPv4 address for the given channel in host
+/// byte order: channel ch → 239.0.0.ch.
+/// Valid input channels are 1, 6, and 11 (see channel::kCandidateChannels).
+static inline uint32_t channelMulticastIp(uint8_t ch) {
+    return (239u << 24) | static_cast<uint32_t>(ch);
+}
+
 /* ── Socket helper ──────────────────────────────────────────────────────── */
 
 static void rebindSocket() {
@@ -77,14 +94,14 @@ static void rebindSocket() {
 
     int opt = 1;
     setsockopt(s_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    setsockopt(s_sock, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
 
     uint16_t port = odh::channel::channelToSimPort(s_currentChannel);
 
-    struct sockaddr_in addr{};
+    // Bind to INADDR_ANY so multicast packets addressed to the group are received.
+    struct sockaddr_in addr {};
     addr.sin_family      = AF_INET;
     addr.sin_port        = htons(port);
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     if (bind(s_sock, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
         perror("[SIM] bind");
@@ -93,10 +110,25 @@ static void rebindSocket() {
         return;
     }
 
-    struct timeval tv{.tv_sec = 0, .tv_usec = 100000};
+    // Join the multicast group for this channel on the loopback interface.
+    struct ip_mreq mreq {};
+    mreq.imr_multiaddr.s_addr = htonl(channelMulticastIp(s_currentChannel));
+    mreq.imr_interface.s_addr = htonl(INADDR_LOOPBACK);
+    if (setsockopt(s_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
+        perror("[SIM] IP_ADD_MEMBERSHIP");
+    }
+
+    // Ensure multicast packets are sent via the loopback interface.
+    struct in_addr iface {};
+    iface.s_addr = htonl(INADDR_LOOPBACK);
+    setsockopt(s_sock, IPPROTO_IP, IP_MULTICAST_IF, &iface, sizeof(iface));
+
+    struct timeval tv {
+        .tv_sec = 0, .tv_usec = 100000
+    };
     setsockopt(s_sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
-    printf("[SIM] Channel %u → UDP port %u\n", s_currentChannel, port);
+    printf("[SIM] Channel %u → UDP multicast 239.0.0.%u:%u\n", s_currentChannel, s_currentChannel, port);
 }
 
 /* ── Listener thread ────────────────────────────────────────────────────── */
@@ -160,10 +192,11 @@ int esp_now_send(const uint8_t *peer_addr, const uint8_t *data, int len) {
     int copyLen = len < ESP_NOW_MAX_DATA_LEN ? len : ESP_NOW_MAX_DATA_LEN;
     memcpy(buf + 6, data, copyLen);
 
-    struct sockaddr_in dest{};
+    // Send to the multicast group for the current channel.
+    struct sockaddr_in dest {};
     dest.sin_family      = AF_INET;
     dest.sin_port        = htons(odh::channel::channelToSimPort(s_currentChannel));
-    dest.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    dest.sin_addr.s_addr = htonl(channelMulticastIp(s_currentChannel));
 
     ssize_t sent = sendto(s_sock, buf, 6 + copyLen, 0, reinterpret_cast<sockaddr *>(&dest), sizeof(dest));
 
@@ -215,9 +248,29 @@ bool esp_now_is_peer_exist(const uint8_t *peer_addr) {
 /* ── Channel switching ──────────────────────────────────────────────────── */
 
 void sim_set_wifi_channel(uint8_t channel) {
+    if (s_currentChannel == channel)
+        return;
+
+    // If the recv thread is running, stop it before touching the socket.
+    // pthread_join guarantees the thread has exited before we rebind.
+    const bool wasRunning = s_running;
+    if (wasRunning) {
+        s_running = false;
+        if (pthread_join(s_recvThread, nullptr) != 0) {
+            perror("[SIM] pthread_join failed during channel switch");
+        }
+    }
+
     s_currentChannel = channel;
-    if (s_running) {
+
+    if (wasRunning) {
         rebindSocket();
+        if (s_sock >= 0) {
+            s_running = true;
+            pthread_create(&s_recvThread, nullptr, recvLoop, nullptr);
+        } else {
+            fprintf(stderr, "[SIM] rebindSocket failed during channel switch to %u\n", channel);
+        }
     }
 }
 
