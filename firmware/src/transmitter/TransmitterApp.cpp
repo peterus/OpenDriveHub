@@ -293,7 +293,7 @@ void TransmitterApp::runChannelAcquisition() {
 
 void TransmitterApp::setupActiveTransmitter() {
     // Register DiscoveryRequest callback – auto-reply is handled by radio layer
-    _radio.onDiscoveryRequest([](const uint8_t * /*mac*/, DeviceRole /*role*/) { Serial.println(F("[ODH] Answered DiscoveryRequest")); });
+    _radio.onDiscoveryRequest([](const uint8_t * /*mac*/, DeviceRole /*role*/) {});
 
     // Register DiscoveryResponse callback for ongoing awareness
     _radio.onDiscoveryResponse([](uint8_t /*ch*/, int8_t /*rssi*/, uint8_t /*devCount*/) {});

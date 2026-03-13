@@ -1,8 +1,10 @@
 {
-    "name": "odh-shell",
-    "version": "1.0.0",
-    "description": "OpenDriveHub interactive shell (command registration, line editing, helpers)",
-    "dependencies": [
-        {"name": "odh-protocol"}
-    ]
+  "name": "odh-shell",
+  "version": "1.0.0",
+  "description": "OpenDriveHub interactive shell (command registration, line editing, helpers)",
+  "dependencies": [
+    {
+      "name": "odh-protocol"
+    }
+  ]
 }
