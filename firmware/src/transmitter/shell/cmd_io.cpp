@@ -85,7 +85,7 @@ int txCmdTrim(Shell &shell, int argc, const char *const *argv, void *ctx) {
 
 // ── module ──────────────────────────────────────────────────────────────
 
-// cppcheck-suppress constParameterCallback
+// cppcheck-suppress constParameterPointer
 int txCmdModule(Shell &shell, int argc, const char *const *argv, void *ctx) {
     if (argc < 2) {
         shell.println("Usage: module <list>");
