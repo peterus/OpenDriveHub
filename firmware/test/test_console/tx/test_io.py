@@ -17,7 +17,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Transmitter-specific console command tests."""
+"""Transmitter-specific tests for ``trim``, ``module``, ``input`` and ``rescan``."""
 
 from __future__ import annotations
 
@@ -26,38 +26,6 @@ import pytest
 from console import Console
 
 pytestmark = pytest.mark.tx
-
-
-class TestBind:
-    """Verify ``bind`` subcommands."""
-
-    def test_bind_scan(self, console: Console) -> None:
-        """``bind scan`` must not crash."""
-        output = console.send_command("bind scan")
-        out_lower = output.lower()
-        assert "error" not in out_lower and "unknown" not in out_lower, (
-            f"bind scan failed:\n{output}"
-        )
-
-    def test_bind_list(self, console: Console) -> None:
-        """``bind list`` must return output (may be empty list)."""
-        output = console.send_command("bind list")
-        # Might say "no vehicles" or list entries – both are fine
-        assert "error" not in output.lower(), (
-            f"bind list returned error:\n{output}"
-        )
-
-
-class TestDisconnect:
-    """Verify ``disconnect`` when not connected."""
-
-    def test_disconnect_when_idle(self, console: Console) -> None:
-        """``disconnect`` when not connected must not crash."""
-        output = console.send_command("disconnect")
-        # May say "not connected" or similar – that's fine
-        assert "error" not in output.lower() or "not connected" in output.lower(), (
-            f"disconnect produced unexpected error:\n{output}"
-        )
 
 
 class TestTrim:
@@ -75,7 +43,6 @@ class TestTrim:
         assert "50" in output, (
             f"trim value 50 not found in trim get:\n{output}"
         )
-        # Reset trim
         console.send_command("trim set 0 0")
 
     def test_trim_set_invalid_range(self, console: Console) -> None:
@@ -84,6 +51,17 @@ class TestTrim:
         out_lower = output.lower()
         assert "error" in out_lower or "invalid" in out_lower or "range" in out_lower or "must be" in out_lower, (
             f"Expected error for out-of-range trim:\n{output}"
+        )
+
+
+class TestTrimGetNotList:
+    """Verify old ``trim list`` syntax is rejected."""
+
+    def test_trim_list_rejected(self, console: Console) -> None:
+        output = console.send_command("trim list")
+        out_lower = output.lower()
+        assert "unknown" in out_lower or "usage" in out_lower or "error" in out_lower, (
+            f"Expected error for old 'trim list' syntax:\n{output}"
         )
 
 
@@ -152,32 +130,4 @@ class TestRescan:
         output = console.send_command("rescan")
         assert "error" not in output.lower(), (
             f"rescan returned error:\n{output}"
-        )
-
-
-class TestTrimGetNotList:
-    """Verify old ``trim list`` syntax is rejected."""
-
-    def test_trim_list_rejected(self, console: Console) -> None:
-        output = console.send_command("trim list")
-        out_lower = output.lower()
-        assert "unknown" in out_lower or "usage" in out_lower or "error" in out_lower, (
-            f"Expected error for old 'trim list' syntax:\n{output}"
-        )
-
-
-class TestBindHelp:
-    """Verify ``bind help`` shows sub-commands."""
-
-    def test_bind_help(self, console: Console) -> None:
-        output = console.send_command("bind help")
-        out_lower = output.lower()
-        assert "scan" in out_lower, (
-            f"bind help missing 'scan':\n{output}"
-        )
-        assert "list" in out_lower, (
-            f"bind help missing 'list':\n{output}"
-        )
-        assert "connect" in out_lower, (
-            f"bind help missing 'connect':\n{output}"
         )
