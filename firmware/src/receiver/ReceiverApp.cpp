@@ -209,6 +209,16 @@ void ReceiverApp::runTelemetryLoop() {
             _radio.sendTelemetry(_battery.voltageMv(), _radio.lastRssi(), linkState, static_cast<uint8_t>(_output.modelType()), 0, nullptr, 0);
         } else {
             _radio.tickPresence(channel::kPresenceIntervalMs);
+
+            // Periodically send a DiscoveryRequest as a heartbeat so the TX
+            // replies with DiscoveryResponse, keeping our activity tracker
+            // alive and preventing spurious transmitter-loss detection.
+            const uint32_t now = millis();
+            if (_discoveryComplete && (now - _lastHeartbeatMs) >= channel::kTransmitterLossTimeoutMs / 2) {
+                _radio.sendDiscoveryRequest();
+                _lastHeartbeatMs = now;
+            }
+
             checkTransmitterLoss();
         }
 
@@ -323,13 +333,22 @@ void ReceiverApp::checkTransmitterLoss() {
 
     // If we haven't heard from any transmitter in a while, re-enter discovery
     if (_discoveryComplete && (millis() - _lastTransmitterActivityMs) > channel::kTransmitterLossTimeoutMs) {
-        Serial.println(F("[ODH-RX] Transmitter lost – re-entering discovery"));
+        Serial.println(F("[ODH-RX] Transmitter lost \xe2\x80\x93 re-entering discovery"));
         _discoveryComplete = false;
     }
 
     // If not discovery complete, periodically retry discovery
     if (!_discoveryComplete) {
         runChannelDiscovery();
+
+        // runChannelDiscovery's RAII guard clears the onDiscoveryResponse
+        // callback (to avoid dangling references to the stack-local scanner).
+        // Re-register the persistent callback so TX activity continues to
+        // be tracked between discovery rounds.
+        _radio.onDiscoveryResponse([this](uint8_t /*ch*/, int8_t /*rssi*/, uint8_t /*devCount*/) {
+            _lastTransmitterActivityMs = millis();
+            _discoveryComplete         = true;
+        });
     }
 }
 

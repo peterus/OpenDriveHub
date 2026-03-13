@@ -97,6 +97,7 @@ private:
     uint8_t _currentChannel             = 0;
     bool _discoveryComplete             = false;
     uint32_t _lastTransmitterActivityMs = 0;
+    uint32_t _lastHeartbeatMs           = 0;
 
     // Vehicle config (loaded from NVS).
     char _vehicleName[kVehicleNameMax] = {};
