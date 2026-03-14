@@ -31,12 +31,42 @@
 
 #include <cstdint>
 
+/* ── esp_wifi types (matching ESP-IDF) ──────────────────────────────────── */
+
 typedef enum {
     WIFI_STA,
     WIFI_AP,
     WIFI_AP_STA,
     WIFI_OFF,
 } wifi_mode_t;
+
+typedef enum {
+    WIFI_SECOND_CHAN_NONE = 0,
+} wifi_second_chan_t;
+
+typedef struct {
+    int8_t rssi;
+} wifi_pkt_rx_ctrl_t;
+
+typedef struct {
+    wifi_pkt_rx_ctrl_t rx_ctrl;
+    uint8_t payload[0];
+} wifi_promiscuous_pkt_t;
+
+typedef enum {
+    WIFI_PKT_MGMT = 0,
+    WIFI_PKT_CTRL,
+    WIFI_PKT_DATA,
+    WIFI_PKT_MISC,
+} wifi_promiscuous_pkt_type_t;
+
+typedef void (*wifi_promiscuous_cb_t)(void *buf, wifi_promiscuous_pkt_type_t type);
+
+/* ── esp_wifi API shim ──────────────────────────────────────────────────── */
+
+void esp_wifi_set_channel(uint8_t channel, wifi_second_chan_t secondary);
+void esp_wifi_set_promiscuous(bool enable);
+void esp_wifi_set_promiscuous_rx_cb(wifi_promiscuous_cb_t cb);
 
 class IPAddress {
     uint32_t _addr;

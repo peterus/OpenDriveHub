@@ -65,11 +65,7 @@ bool TransmitterRadioLink::begin(TelemetryCallback callback) {
 
 bool TransmitterRadioLink::setChannel(uint8_t channel) {
     _wifiChannel = channel;
-#ifdef NATIVE_SIM
-    sim_set_wifi_channel(channel);
-#else
     esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
-#endif
     return true;
 }
 

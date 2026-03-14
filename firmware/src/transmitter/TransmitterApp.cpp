@@ -221,6 +221,14 @@ void TransmitterApp::saveChannel(uint8_t ch) {
 
 /* ── Channel acquisition ─────────────────────────────────────────────────── */
 
+void TransmitterApp::activateChannel(uint8_t ch) {
+    _currentChannel = ch;
+    _radio.setChannel(ch);
+    saveChannel(ch);
+    _channelActive = true;
+    setupActiveTransmitter();
+}
+
 void TransmitterApp::runChannelAcquisition() {
     // Wire up the ChannelScanner callbacks
     ChannelScanner scanner([this](uint8_t ch) -> bool { return _radio.setChannel(ch); }, [this](uint8_t /*ch*/) -> bool { return _radio.sendDiscoveryRequest(); }, [](uint32_t ms) { delay(ms); });
@@ -228,67 +236,47 @@ void TransmitterApp::runChannelAcquisition() {
     // Forward DiscoveryResponse to the scanner
     _radio.onDiscoveryResponse([&scanner](uint8_t ch, int8_t rssi, uint8_t devCount) { scanner.onDiscoveryResponse(ch, rssi, devCount); });
 
-    // Step 1: Try last known good channel from NVS
     uint8_t lastCh = loadChannel();
-    ScanResult results[channel::kCandidateChannelCount];
 
+    // Step 1: Quick-check the last known channel from NVS
     if (channel::isValidChannel(lastCh)) {
         Serial.printf("[ODH] Trying last known channel %u...\n", lastCh);
-        ScanResult result = scanner.scanChannel(lastCh);
-        if (result.foundTransmitter) {
-            _currentChannel = lastCh;
-            _radio.setChannel(lastCh);
-            _channelActive = true;
+        if (scanner.scanChannel(lastCh).foundTransmitter) {
             Serial.printf("[ODH] Joined existing transmitter on channel %u\n", lastCh);
-            setupActiveTransmitter();
+            activateChannel(lastCh);
             return;
         }
     }
 
     // Step 2: Scan all candidate channels
     Serial.println(F("[ODH] Scanning channels 1, 6, 11..."));
+    ScanResult results[channel::kCandidateChannelCount];
     scanner.scanAllChannels(results);
 
-    // Check if any channel has an active transmitter
-    for (uint8_t i = 0; i < channel::kCandidateChannelCount; ++i) {
-        if (results[i].foundTransmitter) {
-            _currentChannel = results[i].channel;
-            _radio.setChannel(results[i].channel);
-            saveChannel(results[i].channel);
-            _channelActive = true;
-            Serial.printf("[ODH] Joined existing transmitter on channel %u\n", results[i].channel);
-            setupActiveTransmitter();
-            return;
-        }
-    }
-
-    // Step 3: No other transmitter found – found a channel
     uint8_t bestCh = ChannelScanner::bestChannel(results);
 
-    // Random backoff before claiming
+    if (ChannelScanner::anyTransmitterFound(results)) {
+        Serial.printf("[ODH] Joined existing transmitter on channel %u\n", bestCh);
+        activateChannel(bestCh);
+        return;
+    }
+
+    // Step 3: No other transmitter found – prefer stored channel, then
+    // back off before claiming.
+    if (channel::isValidChannel(lastCh))
+        bestCh = lastCh;
+
     uint32_t backoff = channel::kFoundingBackoffMinMs + (std::rand() % (channel::kFoundingBackoffMaxMs - channel::kFoundingBackoffMinMs));
     Serial.printf("[ODH] No TX found – backing off %lu ms before claiming channel %u\n", static_cast<unsigned long>(backoff), bestCh);
     delay(backoff);
 
     // One final discovery pass after backoff
-    ScanResult finalCheck = scanner.scanChannel(bestCh);
-    if (finalCheck.foundTransmitter) {
-        _currentChannel = bestCh;
-        _radio.setChannel(bestCh);
-        saveChannel(bestCh);
-        _channelActive = true;
+    if (scanner.scanChannel(bestCh).foundTransmitter) {
         Serial.printf("[ODH] Late discovery – joined transmitter on channel %u\n", bestCh);
-        setupActiveTransmitter();
-        return;
+    } else {
+        Serial.printf("[ODH] Founded channel %u\n", bestCh);
     }
-
-    // Claim the channel
-    _currentChannel = bestCh;
-    _radio.setChannel(bestCh);
-    saveChannel(bestCh);
-    _channelActive = true;
-    Serial.printf("[ODH] Founded channel %u\n", bestCh);
-    setupActiveTransmitter();
+    activateChannel(bestCh);
 }
 
 void TransmitterApp::setupActiveTransmitter() {

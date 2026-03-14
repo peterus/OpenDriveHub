@@ -63,6 +63,9 @@ public:
     /// If none have a transmitter, returns the channel that appears quietest.
     static uint8_t bestChannel(const ScanResult results[channel::kCandidateChannelCount]);
 
+    /// Returns true if any candidate channel has an active transmitter.
+    static bool anyTransmitterFound(const ScanResult results[channel::kCandidateChannelCount]);
+
     /// Called by the radio layer when a DiscoveryResponse is received.
     /// Thread-safe: sets internal flag for the current scan wait.
     void onDiscoveryResponse(uint8_t channel, int8_t rssi, uint8_t deviceCount);

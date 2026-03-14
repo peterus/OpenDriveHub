@@ -23,11 +23,14 @@
  * sim_arduino.cpp – Arduino API implementation for Linux simulation.
  */
 
+#include <esp_now.h>
+
 #include "Arduino.h"
 
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <thread>
 #include <unistd.h>
 
@@ -245,11 +248,35 @@ static void stdinReaderThread(int fd) {
     }
 }
 
-int main(int, char **) {
+/// Parse command-line arguments:
+///   --rssi <ch>:<dBm>[,<ch>:<dBm>]   Set simulated RSSI per channel
+static void parseArgs(int argc, char **argv) {
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--rssi") == 0 && i + 1 < argc) {
+            ++i;
+            // Parse "ch:rssi" pairs, e.g. "6:-30" or "1:-45,6:-30,11:-70"
+            char *arg = argv[i];
+            while (arg && *arg) {
+                int ch = 0, rssi = 0;
+                if (std::sscanf(arg, "%d:%d", &ch, &rssi) == 2) {
+                    sim_set_channel_rssi(static_cast<uint8_t>(ch), static_cast<int8_t>(rssi));
+                    printf("[SIM] Channel %d RSSI set to %d dBm\n", ch, rssi);
+                }
+                // Advance to next comma-separated pair
+                char *comma = std::strchr(arg, ',');
+                arg         = comma ? comma + 1 : nullptr;
+            }
+        }
+    }
+}
+
+int main(int argc, char **argv) {
     /* Disable buffering on both stdout and stdin so the interactive shell
      * prompt, character echo and input are immediate. */
     setvbuf(stdout, nullptr, _IONBF, 0);
     setvbuf(stdin, nullptr, _IONBF, 0);
+
+    parseArgs(argc, argv);
 
     int inputFd = STDIN_FILENO;
 #ifdef HAS_TERMIOS

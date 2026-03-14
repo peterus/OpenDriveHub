@@ -70,4 +70,8 @@ void sim_set_wifi_channel(uint8_t channel);
 /// Get the current simulated WiFi channel.
 uint8_t sim_get_wifi_channel();
 
+/// Set the simulated RSSI (dBm) for a specific WiFi channel.
+/// Use this to influence which channel the scanner prefers.
+void sim_set_channel_rssi(uint8_t channel, int8_t rssi);
+
 #endif /* SIM_ESP_NOW_H */

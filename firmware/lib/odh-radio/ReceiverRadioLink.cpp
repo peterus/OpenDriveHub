@@ -36,13 +36,11 @@ namespace odh {
 
 static volatile int8_t sPromiscRssi = 0;
 
-#ifndef NATIVE_SIM
 // cppcheck-suppress constParameterCallback
 static void promiscRxCb(void *buf, wifi_promiscuous_pkt_type_t /*type*/) {
     const auto *pkt = static_cast<const wifi_promiscuous_pkt_t *>(buf);
     sPromiscRssi    = pkt->rx_ctrl.rssi;
 }
-#endif
 
 ReceiverRadioLink *ReceiverRadioLink::sInstance = nullptr;
 
@@ -68,10 +66,8 @@ bool ReceiverRadioLink::begin(ControlCallback callback) {
     esp_now_register_recv_cb(onReceive);
     esp_now_register_send_cb(onSent);
 
-#ifndef NATIVE_SIM
     esp_wifi_set_promiscuous(true);
     esp_wifi_set_promiscuous_rx_cb(promiscRxCb);
-#endif
 
     _ready = true;
     return true;
@@ -81,11 +77,7 @@ bool ReceiverRadioLink::begin(ControlCallback callback) {
 
 bool ReceiverRadioLink::setChannel(uint8_t channel) {
     _wifiChannel = channel;
-#ifdef NATIVE_SIM
-    sim_set_wifi_channel(channel);
-#else
     esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
-#endif
     return true;
 }
 

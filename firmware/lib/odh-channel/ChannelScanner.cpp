@@ -88,6 +88,14 @@ uint8_t ChannelScanner::bestChannel(const ScanResult results[channel::kCandidate
     return channel::kCandidateChannels[0];
 }
 
+bool ChannelScanner::anyTransmitterFound(const ScanResult results[channel::kCandidateChannelCount]) {
+    for (uint8_t i = 0; i < channel::kCandidateChannelCount; ++i) {
+        if (results[i].foundTransmitter)
+            return true;
+    }
+    return false;
+}
+
 void ChannelScanner::onDiscoveryResponse(uint8_t /*channel*/, int8_t rssi, uint8_t deviceCount) {
     _responseRssi        = rssi;
     _responseDeviceCount = deviceCount;

@@ -39,6 +39,7 @@
 
 #include "Arduino.h"
 #include "Channel.h"
+#include "WiFi.h"
 #include "esp_now.h"
 
 #include <arpa/inet.h>
@@ -69,6 +70,13 @@ static std::mutex s_peerMutex;
 static uint8_t s_localMac[6]    = {};
 static uint8_t s_currentChannel = 1;
 
+/// Per-channel simulated RSSI values (indexed by channel number).
+/// Default is -50 dBm for all channels.
+static int8_t s_channelRssi[16] = {-50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50};
+
+static wifi_promiscuous_cb_t s_promiscCb = nullptr;
+static bool s_promiscEnabled             = false;
+
 /* ── Multicast helper ───────────────────────────────────────────────────── */
 
 /// Returns the multicast group IPv4 address for the given channel in host
@@ -98,7 +106,7 @@ static void rebindSocket() {
     uint16_t port = odh::channel::channelToSimPort(s_currentChannel);
 
     // Bind to INADDR_ANY so multicast packets addressed to the group are received.
-    struct sockaddr_in addr {};
+    struct sockaddr_in addr{};
     addr.sin_family      = AF_INET;
     addr.sin_port        = htons(port);
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -111,7 +119,7 @@ static void rebindSocket() {
     }
 
     // Join the multicast group for this channel on the loopback interface.
-    struct ip_mreq mreq {};
+    struct ip_mreq mreq{};
     mreq.imr_multiaddr.s_addr = htonl(channelMulticastIp(s_currentChannel));
     mreq.imr_interface.s_addr = htonl(INADDR_LOOPBACK);
     if (setsockopt(s_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
@@ -119,13 +127,11 @@ static void rebindSocket() {
     }
 
     // Ensure multicast packets are sent via the loopback interface.
-    struct in_addr iface {};
+    struct in_addr iface{};
     iface.s_addr = htonl(INADDR_LOOPBACK);
     setsockopt(s_sock, IPPROTO_IP, IP_MULTICAST_IF, &iface, sizeof(iface));
 
-    struct timeval tv {
-        .tv_sec = 0, .tv_usec = 100000
-    };
+    struct timeval tv{.tv_sec = 0, .tv_usec = 100000};
     setsockopt(s_sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
     printf("[SIM] Channel %u → UDP multicast 239.0.0.%u:%u\n", s_currentChannel, s_currentChannel, port);
@@ -140,6 +146,14 @@ static void *recvLoop(void *) {
         if (n > 6 && s_recvCb) {
             if (memcmp(buf, s_localMac, 6) == 0)
                 continue;
+            // Fire the promiscuous callback before the ESP-NOW callback,
+            // exactly mirroring real ESP32 behaviour.  This lets the
+            // radio layer read RSSI via the normal promiscRxCb path.
+            if (s_promiscEnabled && s_promiscCb) {
+                wifi_promiscuous_pkt_t pkt{};
+                pkt.rx_ctrl.rssi = s_channelRssi[s_currentChannel];
+                s_promiscCb(&pkt, WIFI_PKT_DATA);
+            }
             s_recvCb(buf, buf + 6, static_cast<int>(n - 6));
         }
     }
@@ -193,7 +207,7 @@ int esp_now_send(const uint8_t *peer_addr, const uint8_t *data, int len) {
     memcpy(buf + 6, data, copyLen);
 
     // Send to the multicast group for the current channel.
-    struct sockaddr_in dest {};
+    struct sockaddr_in dest{};
     dest.sin_family      = AF_INET;
     dest.sin_port        = htons(odh::channel::channelToSimPort(s_currentChannel));
     dest.sin_addr.s_addr = htonl(channelMulticastIp(s_currentChannel));
@@ -276,4 +290,24 @@ void sim_set_wifi_channel(uint8_t channel) {
 
 uint8_t sim_get_wifi_channel() {
     return s_currentChannel;
+}
+
+void sim_set_channel_rssi(uint8_t channel, int8_t rssi) {
+    if (channel < 16) {
+        s_channelRssi[channel] = rssi;
+    }
+}
+
+/* ── esp_wifi API shim ───────────────────────────────────────────────────── */
+
+void esp_wifi_set_channel(uint8_t channel, wifi_second_chan_t /*secondary*/) {
+    sim_set_wifi_channel(channel);
+}
+
+void esp_wifi_set_promiscuous(bool enable) {
+    s_promiscEnabled = enable;
+}
+
+void esp_wifi_set_promiscuous_rx_cb(wifi_promiscuous_cb_t cb) {
+    s_promiscCb = cb;
 }

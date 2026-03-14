@@ -129,6 +129,7 @@ private:
 
     // Channel discovery
     void runChannelAcquisition();
+    void activateChannel(uint8_t ch);
     void setupActiveTransmitter();
     void saveChannel(uint8_t channel);
     uint8_t loadChannel();
