@@ -184,7 +184,8 @@ $(RENDER_DIR)/assembly/exploded_%.png: assembly.scad $$(SCAD_DEPS)
 clean:
 	rm -rf $(foreach s,$(STEMS),$(RENDER_DIR)/$(s))
 
-clean-all: clean
+clean-all:
+	rm -rf $(RENDER_DIR)
 
 # ─── Information ──────────────────────────────────────────────────────────────
 
@@ -204,7 +205,8 @@ help:
 	@echo "  all / renders        Render all parts in all views  ($(words $(ALL_PNGS)) images)"
 	@echo "  stl                  Export all parts as STL        ($(words $(ALL_STLS)) files)"
 	@echo "  assembly-exploded    Exploded assembly renders"
-	@echo "  clean                Remove all generated files"
+	@echo "  clean                Remove per-part render directories"
+	@echo "  clean-all            Remove entire $(RENDER_DIR)/ directory"
 	@echo "  list-parts           Show auto-discovered parts"
 	@echo "  help                 Show this help"
 	@echo ""
