@@ -38,8 +38,8 @@ module module_zone() {
     h = zone_height;
 
     // Grid position (centered on X, centered on Y)
-    grid_w = bay_grid_cols * (bay_unit_size + bay_wall) + bay_wall;
-    grid_d = bay_grid_rows * (bay_unit_size + bay_wall) + bay_wall;
+    grid_w = bay_grid_width;
+    grid_d = bay_grid_height;
     grid_x = (w - grid_w) / 2;
     grid_y = (d - grid_d) / 2;
 
