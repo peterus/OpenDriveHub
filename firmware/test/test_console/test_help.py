@@ -56,6 +56,24 @@ class TestHelp:
         output = console.send_command("help")
         assert "vehicle" in output.lower()
 
+    @pytest.mark.rx
+    def test_help_lists_mapping(self, console: Console) -> None:
+        """RX ``help`` must list the ``mapping`` command."""
+        output = console.send_command("help")
+        assert "mapping" in output.lower()
+
+    @pytest.mark.rx
+    def test_help_lists_failsafe(self, console: Console) -> None:
+        """RX ``help`` must list the ``failsafe`` command."""
+        output = console.send_command("help")
+        assert "failsafe" in output.lower()
+
+    @pytest.mark.rx
+    def test_help_lists_reboot_rx(self, console: Console) -> None:
+        """RX ``help`` must list the ``reboot`` command."""
+        output = console.send_command("help")
+        assert "reboot" in output.lower()
+
     @pytest.mark.tx
     def test_help_lists_bind(self, console: Console) -> None:
         """TX ``help`` must list the ``bind`` command."""
@@ -79,3 +97,21 @@ class TestHelp:
         """TX ``help`` must list the ``disconnect`` command."""
         output = console.send_command("help")
         assert "disconnect" in output.lower()
+
+    @pytest.mark.tx
+    def test_help_lists_input(self, console: Console) -> None:
+        """TX ``help`` must list the ``input`` command."""
+        output = console.send_command("help")
+        assert "input" in output.lower()
+
+    @pytest.mark.tx
+    def test_help_lists_rescan(self, console: Console) -> None:
+        """TX ``help`` must list the ``rescan`` command."""
+        output = console.send_command("help")
+        assert "rescan" in output.lower()
+
+    @pytest.mark.tx
+    def test_help_lists_reboot_tx(self, console: Console) -> None:
+        """TX ``help`` must list the ``reboot`` command."""
+        output = console.send_command("help")
+        assert "reboot" in output.lower()

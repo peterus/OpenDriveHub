@@ -17,7 +17,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Transmitter-specific console command tests."""
+"""Transmitter-specific tests for ``bind`` and ``disconnect`` commands."""
 
 from __future__ import annotations
 
@@ -42,9 +42,25 @@ class TestBind:
     def test_bind_list(self, console: Console) -> None:
         """``bind list`` must return output (may be empty list)."""
         output = console.send_command("bind list")
-        # Might say "no vehicles" or list entries – both are fine
         assert "error" not in output.lower(), (
             f"bind list returned error:\n{output}"
+        )
+
+
+class TestBindHelp:
+    """Verify ``bind help`` shows sub-commands."""
+
+    def test_bind_help(self, console: Console) -> None:
+        output = console.send_command("bind help")
+        out_lower = output.lower()
+        assert "scan" in out_lower, (
+            f"bind help missing 'scan':\n{output}"
+        )
+        assert "list" in out_lower, (
+            f"bind help missing 'list':\n{output}"
+        )
+        assert "connect" in out_lower, (
+            f"bind help missing 'connect':\n{output}"
         )
 
 
@@ -54,45 +70,6 @@ class TestDisconnect:
     def test_disconnect_when_idle(self, console: Console) -> None:
         """``disconnect`` when not connected must not crash."""
         output = console.send_command("disconnect")
-        # May say "not connected" or similar – that's fine
         assert "error" not in output.lower() or "not connected" in output.lower(), (
             f"disconnect produced unexpected error:\n{output}"
-        )
-
-
-class TestTrim:
-    """Verify ``trim`` subcommands."""
-
-    def test_trim_list(self, console: Console) -> None:
-        """``trim list`` must return formatted output."""
-        output = console.send_command("trim list")
-        assert len(output.strip()) > 0, "trim list returned empty output"
-
-    def test_trim_set_get_roundtrip(self, console: Console) -> None:
-        """Set trim, verify it appears in ``trim list``."""
-        console.send_command("trim set 0 50")
-        output = console.send_command("trim list")
-        assert "50" in output, (
-            f"trim value 50 not found in trim list:\n{output}"
-        )
-        # Reset trim
-        console.send_command("trim set 0 0")
-
-    def test_trim_set_invalid_range(self, console: Console) -> None:
-        """Setting trim outside -100..+100 must fail."""
-        output = console.send_command("trim set 0 200")
-        out_lower = output.lower()
-        assert "error" in out_lower or "invalid" in out_lower or "range" in out_lower or "must be" in out_lower, (
-            f"Expected error for out-of-range trim:\n{output}"
-        )
-
-
-class TestModule:
-    """Verify ``module`` command."""
-
-    def test_module_list(self, console: Console) -> None:
-        """``module`` must return output (may report no modules in sim)."""
-        output = console.send_command("module")
-        assert "error" not in output.lower(), (
-            f"module returned error:\n{output}"
         )

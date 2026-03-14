@@ -20,15 +20,26 @@
  */
 
 /**
- * sim_espnow.cpp – ESP-NOW over UDP sockets.
+ * sim_espnow.cpp – ESP-NOW over UDP multicast sockets.
  *
- * Each simulated device listens on its own port (TX=6001, RX=6002) and
- * sends to the other's port.  Packets include a 6-byte source MAC header
- * prepended to the original payload so the receive callback gets the
- * sender's address.
+ * Each WiFi channel maps to a UDP multicast group and port:
+ *   channel 1  → 239.0.0.1:7001
+ *   channel 6  → 239.0.0.6:7006
+ *   channel 11 → 239.0.0.11:7011
+ *
+ * Using multicast ensures that every process on the same channel receives
+ * every packet (fan-out), unlike SO_REUSEPORT unicast which only delivers
+ * to one socket.  The receive thread is stopped and restarted whenever the
+ * channel changes so the socket is never accessed concurrently with rebind.
+ *
+ * Packets include a 6-byte source MAC header prepended to the original
+ * payload so the receive callback gets the sender's address.
+ * Self-packets are filtered by comparing the source MAC.
  */
 
 #include "Arduino.h"
+#include "Channel.h"
+#include "WiFi.h"
 #include "esp_now.h"
 
 #include <arpa/inet.h>
@@ -56,7 +67,75 @@ struct PeerEntry {
 static std::vector<PeerEntry> s_peers;
 static std::mutex s_peerMutex;
 
-static uint8_t s_localMac[6] = {};
+static uint8_t s_localMac[6]    = {};
+static uint8_t s_currentChannel = 1;
+
+/// Per-channel simulated RSSI values (indexed by channel number).
+/// Default is -50 dBm for all channels.
+static int8_t s_channelRssi[16] = {-50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50};
+
+static wifi_promiscuous_cb_t s_promiscCb = nullptr;
+static bool s_promiscEnabled             = false;
+
+/* ── Multicast helper ───────────────────────────────────────────────────── */
+
+/// Returns the multicast group IPv4 address for the given channel in host
+/// byte order: channel ch → 239.0.0.ch.
+/// Valid input channels are 1, 6, and 11 (see channel::kCandidateChannels).
+static inline uint32_t channelMulticastIp(uint8_t ch) {
+    return (239u << 24) | static_cast<uint32_t>(ch);
+}
+
+/* ── Socket helper ──────────────────────────────────────────────────────── */
+
+static void rebindSocket() {
+    if (s_sock >= 0) {
+        close(s_sock);
+        s_sock = -1;
+    }
+
+    s_sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (s_sock < 0) {
+        perror("[SIM] socket");
+        return;
+    }
+
+    int opt = 1;
+    setsockopt(s_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    uint16_t port = odh::channel::channelToSimPort(s_currentChannel);
+
+    // Bind to INADDR_ANY so multicast packets addressed to the group are received.
+    struct sockaddr_in addr{};
+    addr.sin_family      = AF_INET;
+    addr.sin_port        = htons(port);
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    if (bind(s_sock, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
+        perror("[SIM] bind");
+        close(s_sock);
+        s_sock = -1;
+        return;
+    }
+
+    // Join the multicast group for this channel on the loopback interface.
+    struct ip_mreq mreq{};
+    mreq.imr_multiaddr.s_addr = htonl(channelMulticastIp(s_currentChannel));
+    mreq.imr_interface.s_addr = htonl(INADDR_LOOPBACK);
+    if (setsockopt(s_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
+        perror("[SIM] IP_ADD_MEMBERSHIP");
+    }
+
+    // Ensure multicast packets are sent via the loopback interface.
+    struct in_addr iface{};
+    iface.s_addr = htonl(INADDR_LOOPBACK);
+    setsockopt(s_sock, IPPROTO_IP, IP_MULTICAST_IF, &iface, sizeof(iface));
+
+    struct timeval tv{.tv_sec = 0, .tv_usec = 100000};
+    setsockopt(s_sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    printf("[SIM] Channel %u → UDP multicast 239.0.0.%u:%u\n", s_currentChannel, s_currentChannel, port);
+}
 
 /* ── Listener thread ────────────────────────────────────────────────────── */
 
@@ -65,6 +144,16 @@ static void *recvLoop(void *) {
     while (s_running) {
         ssize_t n = recvfrom(s_sock, buf, sizeof(buf), 0, nullptr, nullptr);
         if (n > 6 && s_recvCb) {
+            if (memcmp(buf, s_localMac, 6) == 0)
+                continue;
+            // Fire the promiscuous callback before the ESP-NOW callback,
+            // exactly mirroring real ESP32 behaviour.  This lets the
+            // radio layer read RSSI via the normal promiscRxCb path.
+            if (s_promiscEnabled && s_promiscCb) {
+                wifi_promiscuous_pkt_t pkt{};
+                pkt.rx_ctrl.rssi = s_channelRssi[s_currentChannel];
+                s_promiscCb(&pkt, WIFI_PKT_DATA);
+            }
             s_recvCb(buf, buf + 6, static_cast<int>(n - 6));
         }
     }
@@ -74,39 +163,16 @@ static void *recvLoop(void *) {
 /* ── ESP-NOW API ────────────────────────────────────────────────────────── */
 
 int esp_now_init() {
-    /* Create a UDP socket bound to the listen port. */
-    s_sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (s_sock < 0) {
-        perror("[SIM] socket");
-        return ESP_FAIL;
-    }
-
-    int opt = 1;
-    setsockopt(s_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-
-    struct sockaddr_in addr{};
-    addr.sin_family      = AF_INET;
-    addr.sin_port        = htons(SIM_LISTEN_PORT);
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-
-    if (bind(s_sock, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
-        perror("[SIM] bind");
-        close(s_sock);
-        s_sock = -1;
-        return ESP_FAIL;
-    }
-
-    /* Set a receive timeout so the thread can check s_running. */
-    struct timeval tv{.tv_sec = 0, .tv_usec = 100000}; /* 100 ms */
-    setsockopt(s_sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
     esp_read_mac(s_localMac, ESP_MAC_WIFI_STA);
+
+    rebindSocket();
+    if (s_sock < 0)
+        return ESP_FAIL;
 
     /* Start the listener thread. */
     s_running = true;
     pthread_create(&s_recvThread, nullptr, recvLoop, nullptr);
 
-    printf("[SIM] ESP-NOW init OK – listening on port %d, sending to port %d\n", SIM_LISTEN_PORT, SIM_SEND_PORT);
     return ESP_OK;
 }
 
@@ -140,10 +206,11 @@ int esp_now_send(const uint8_t *peer_addr, const uint8_t *data, int len) {
     int copyLen = len < ESP_NOW_MAX_DATA_LEN ? len : ESP_NOW_MAX_DATA_LEN;
     memcpy(buf + 6, data, copyLen);
 
+    // Send to the multicast group for the current channel.
     struct sockaddr_in dest{};
     dest.sin_family      = AF_INET;
-    dest.sin_port        = htons(SIM_SEND_PORT);
-    dest.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    dest.sin_port        = htons(odh::channel::channelToSimPort(s_currentChannel));
+    dest.sin_addr.s_addr = htonl(channelMulticastIp(s_currentChannel));
 
     ssize_t sent = sendto(s_sock, buf, 6 + copyLen, 0, reinterpret_cast<sockaddr *>(&dest), sizeof(dest));
 
@@ -190,4 +257,57 @@ bool esp_now_is_peer_exist(const uint8_t *peer_addr) {
             return true;
     }
     return false;
+}
+
+/* ── Channel switching ──────────────────────────────────────────────────── */
+
+void sim_set_wifi_channel(uint8_t channel) {
+    if (s_currentChannel == channel)
+        return;
+
+    // If the recv thread is running, stop it before touching the socket.
+    // pthread_join guarantees the thread has exited before we rebind.
+    const bool wasRunning = s_running;
+    if (wasRunning) {
+        s_running = false;
+        if (pthread_join(s_recvThread, nullptr) != 0) {
+            perror("[SIM] pthread_join failed during channel switch");
+        }
+    }
+
+    s_currentChannel = channel;
+
+    if (wasRunning) {
+        rebindSocket();
+        if (s_sock >= 0) {
+            s_running = true;
+            pthread_create(&s_recvThread, nullptr, recvLoop, nullptr);
+        } else {
+            fprintf(stderr, "[SIM] rebindSocket failed during channel switch to %u\n", channel);
+        }
+    }
+}
+
+uint8_t sim_get_wifi_channel() {
+    return s_currentChannel;
+}
+
+void sim_set_channel_rssi(uint8_t channel, int8_t rssi) {
+    if (channel < 16) {
+        s_channelRssi[channel] = rssi;
+    }
+}
+
+/* ── esp_wifi API shim ───────────────────────────────────────────────────── */
+
+void esp_wifi_set_channel(uint8_t channel, wifi_second_chan_t /*secondary*/) {
+    sim_set_wifi_channel(channel);
+}
+
+void esp_wifi_set_promiscuous(bool enable) {
+    s_promiscEnabled = enable;
+}
+
+void esp_wifi_set_promiscuous_rx_cb(wifi_promiscuous_cb_t cb) {
+    s_promiscCb = cb;
 }

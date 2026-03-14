@@ -42,14 +42,13 @@ using ControlCallback = std::function<void(const ControlPacket &pkt)>;
 /// Callback type for received telemetry packets (transmitter side).
 using TelemetryCallback = std::function<void(const TelemetryPacket &pkt)>;
 
-/// A vehicle discovered via announce broadcasts (transmitter side).
-struct DiscoveredVehicle {
-    uint8_t mac[6]{};
-    uint8_t modelType = 0;
-    char name[kVehicleNameMax]{};
-    uint32_t lastSeenMs = 0; ///< millis() timestamp of last announce
-    int8_t rssi         = 0; ///< RSSI of last announce packet (dBm)
-    bool valid          = false;
-};
+/// Callback when a DiscoveryResponse is received.
+using DiscoveryResponseCallback = std::function<void(uint8_t channel, int8_t rssi, uint8_t deviceCount)>;
+
+/// Callback when a ChannelMigration is received.
+using ChannelMigrationCallback = std::function<void(uint8_t newChannel)>;
+
+/// Callback when a DiscoveryRequest is received (transmitter answers these).
+using DiscoveryRequestCallback = std::function<void(const uint8_t *mac, DeviceRole role)>;
 
 } // namespace odh

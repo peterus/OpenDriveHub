@@ -1,0 +1,8 @@
+{
+    "name": "odh-channel",
+    "version": "1.0.0",
+    "description": "OpenDriveHub shared channel model and discovery scanner",
+    "dependencies": [
+        {"name": "odh-protocol"}
+    ]
+}

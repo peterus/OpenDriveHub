@@ -17,7 +17,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Receiver-specific console command tests."""
+"""Receiver-specific tests for ``channel``, ``vehicle`` and config roundtrip."""
 
 from __future__ import annotations
 
@@ -38,7 +38,6 @@ class TestVehicle:
 
     def test_vehicle_set_get_roundtrip(self, console: Console) -> None:
         """Set vehicle name, then read it back."""
-        # Save original
         original = console.send_command("vehicle").strip()
 
         console.send_command('vehicle "TestCar"')
@@ -47,7 +46,6 @@ class TestVehicle:
             f"Vehicle name not updated to TestCar:\n{output}"
         )
 
-        # Restore original
         if original:
             console.send_command(f'vehicle "{original}"')
 
@@ -56,7 +54,7 @@ class TestChannelSetRx:
     """Verify ``channel set`` on the receiver."""
 
     def test_channel_set_valid(self, console: Console) -> None:
-        """Setting channel 0 to 1500µs must succeed."""
+        """Setting channel 0 to 1500us must succeed."""
         output = console.send_command("channel set 0 1500")
         out_lower = output.lower()
         assert "error" not in out_lower and "invalid" not in out_lower, (
@@ -78,3 +76,29 @@ class TestChannelSetRx:
         assert "error" in out_lower or "invalid" in out_lower or "range" in out_lower or "must be" in out_lower, (
             f"Expected error for invalid PWM value:\n{output}"
         )
+
+
+class TestConfigSetVehicle:
+    """Verify ``config set vehicle`` on the receiver."""
+
+    def test_config_set_vehicle(self, console: Console) -> None:
+        """Setting vehicle via config set must update vehicle name."""
+        console.send_command('config set vehicle "TestTruck"')
+        output = console.send_command("vehicle")
+        assert "TestTruck" in output, (
+            f"Vehicle not set to TestTruck:\n{output}"
+        )
+        console.send_command('config set vehicle "RX"')
+
+
+class TestConfigRoundtripRx:
+    """Verify ``config set`` followed by ``config get`` persists values."""
+
+    def test_config_set_get_batt_cell_rx(self, console: Console) -> None:
+        """RX: set batt_cell, read it back."""
+        console.send_command("config set batt_cell 3")
+        output = console.send_command("config get")
+        assert "3" in output, (
+            f"batt_cell not set to 3 in config get:\n{output}"
+        )
+        console.send_command("config set batt_cell 0")

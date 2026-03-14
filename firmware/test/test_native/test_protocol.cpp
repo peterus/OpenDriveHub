@@ -118,28 +118,28 @@ void test_bind_packet_size(void) {
 }
 
 void test_announce_packet_size(void) {
-    TEST_ASSERT_LESS_OR_EQUAL(250, static_cast<int>(sizeof(AnnouncePacket)));
+    TEST_ASSERT_LESS_OR_EQUAL(250, static_cast<int>(sizeof(ReceiverPresencePacket)));
 }
 
-/* ── Announce packet ─────────────────────────────────────────────────────── */
+/* ── ReceiverPresence packet ─────────────────────────────────────────────── */
 
 void test_announce_packet_fields(void) {
-    AnnouncePacket pkt{};
-    fillHeader(pkt, PacketType::Announce);
+    ReceiverPresencePacket pkt{};
+    fillHeader(pkt, PacketType::ReceiverPresence);
     pkt.model_type = static_cast<uint8_t>(ModelType::Excavator);
 
     const char *name = "TestVehicle";
     std::memcpy(pkt.name, name, std::strlen(name) + 1);
 
     TEST_ASSERT_EQUAL_UINT8(kMagic0, pkt.magic[0]);
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(PacketType::Announce), pkt.type);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(PacketType::ReceiverPresence), pkt.type);
     TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ModelType::Excavator), pkt.model_type);
     TEST_ASSERT_EQUAL_STRING("TestVehicle", pkt.name);
 }
 
 void test_announce_packet_checksum(void) {
-    AnnouncePacket pkt{};
-    fillHeader(pkt, PacketType::Announce);
+    ReceiverPresencePacket pkt{};
+    fillHeader(pkt, PacketType::ReceiverPresence);
     pkt.model_type = static_cast<uint8_t>(ModelType::Crane);
     std::strncpy(pkt.name, "MyCrane", kVehicleNameMax - 1);
     pkt.mac[0] = 0xAA;
@@ -152,8 +152,8 @@ void test_announce_packet_checksum(void) {
 }
 
 void test_announce_packet_checksum_detects_corruption(void) {
-    AnnouncePacket pkt{};
-    fillHeader(pkt, PacketType::Announce);
+    ReceiverPresencePacket pkt{};
+    fillHeader(pkt, PacketType::ReceiverPresence);
     pkt.model_type = static_cast<uint8_t>(ModelType::Generic);
     setChecksum(pkt);
 
@@ -330,6 +330,44 @@ extern void test_model_name_excavator(void);
 extern void test_model_name_unknown(void);
 extern void test_channel_assignments_unique(void);
 
+/* Forward-declarations – channel / discovery tests (test_channel.cpp). */
+extern void test_channel_valid_1(void);
+extern void test_channel_valid_6(void);
+extern void test_channel_valid_11(void);
+extern void test_channel_invalid_0(void);
+extern void test_channel_invalid_2(void);
+extern void test_channel_invalid_5(void);
+extern void test_channel_invalid_7(void);
+extern void test_channel_invalid_12(void);
+extern void test_channel_invalid_13(void);
+extern void test_channel_invalid_255(void);
+extern void test_candidate_channel_count(void);
+extern void test_candidate_channel_0_is_1(void);
+extern void test_candidate_channel_1_is_6(void);
+extern void test_candidate_channel_2_is_11(void);
+extern void test_default_channel(void);
+extern void test_sim_port_channel_1(void);
+extern void test_sim_port_channel_6(void);
+extern void test_sim_port_channel_11(void);
+extern void test_sim_port_invalid_fallback(void);
+extern void test_channel_settle_positive(void);
+extern void test_discovery_wait_positive(void);
+extern void test_discovery_retries_at_least_one(void);
+extern void test_presence_interval_positive(void);
+extern void test_transmitter_loss_exceeds_presence(void);
+extern void test_founding_backoff_max_exceeds_min(void);
+extern void test_discovery_request_packet_size(void);
+extern void test_discovery_response_packet_size(void);
+extern void test_receiver_presence_packet_size(void);
+extern void test_channel_migration_packet_size(void);
+extern void test_discovery_request_checksum(void);
+extern void test_discovery_response_checksum(void);
+extern void test_receiver_presence_checksum(void);
+extern void test_channel_migration_checksum(void);
+extern void test_scanner_no_response(void);
+extern void test_scanner_with_response(void);
+extern void test_scanner_best_channel_with_transmitter(void);
+extern void test_scanner_best_channel_no_transmitter(void);
 /* Shell tokenizer tests (test_shell.cpp) */
 extern void test_tokenize_single_word(void);
 extern void test_tokenize_two_words(void);
@@ -460,6 +498,50 @@ int main(int argc, char **argv) {
     RUN_TEST(test_model_name_unknown);
     RUN_TEST(test_channel_assignments_unique);
 
+    /* Channel / discovery tests */
+    RUN_TEST(test_channel_valid_1);
+    RUN_TEST(test_channel_valid_6);
+    RUN_TEST(test_channel_valid_11);
+    RUN_TEST(test_channel_invalid_0);
+    RUN_TEST(test_channel_invalid_2);
+    RUN_TEST(test_channel_invalid_5);
+    RUN_TEST(test_channel_invalid_7);
+    RUN_TEST(test_channel_invalid_12);
+    RUN_TEST(test_channel_invalid_13);
+    RUN_TEST(test_channel_invalid_255);
+
+    RUN_TEST(test_candidate_channel_count);
+    RUN_TEST(test_candidate_channel_0_is_1);
+    RUN_TEST(test_candidate_channel_1_is_6);
+    RUN_TEST(test_candidate_channel_2_is_11);
+    RUN_TEST(test_default_channel);
+
+    RUN_TEST(test_sim_port_channel_1);
+    RUN_TEST(test_sim_port_channel_6);
+    RUN_TEST(test_sim_port_channel_11);
+    RUN_TEST(test_sim_port_invalid_fallback);
+
+    RUN_TEST(test_channel_settle_positive);
+    RUN_TEST(test_discovery_wait_positive);
+    RUN_TEST(test_discovery_retries_at_least_one);
+    RUN_TEST(test_presence_interval_positive);
+    RUN_TEST(test_transmitter_loss_exceeds_presence);
+    RUN_TEST(test_founding_backoff_max_exceeds_min);
+
+    RUN_TEST(test_discovery_request_packet_size);
+    RUN_TEST(test_discovery_response_packet_size);
+    RUN_TEST(test_receiver_presence_packet_size);
+    RUN_TEST(test_channel_migration_packet_size);
+
+    RUN_TEST(test_discovery_request_checksum);
+    RUN_TEST(test_discovery_response_checksum);
+    RUN_TEST(test_receiver_presence_checksum);
+    RUN_TEST(test_channel_migration_checksum);
+
+    RUN_TEST(test_scanner_no_response);
+    RUN_TEST(test_scanner_with_response);
+    RUN_TEST(test_scanner_best_channel_with_transmitter);
+    RUN_TEST(test_scanner_best_channel_no_transmitter);
     /* Shell tokenizer tests */
     RUN_TEST(test_tokenize_single_word);
     RUN_TEST(test_tokenize_two_words);

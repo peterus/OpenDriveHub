@@ -23,11 +23,14 @@
  * sim_arduino.cpp – Arduino API implementation for Linux simulation.
  */
 
+#include <esp_now.h>
+
 #include "Arduino.h"
 
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <thread>
 #include <unistd.h>
 
@@ -166,12 +169,29 @@ int analogRead(uint8_t) {
 
 /* ── MAC address ────────────────────────────────────────────────────────── */
 
+/// Generate a per-process unique MAC address so that multiple simulation
+/// instances of the same role (e.g. two sim_tx) are distinguishable.
+/// The last two bytes are derived from the process ID.
 void esp_read_mac(uint8_t *mac, esp_mac_type_t) {
+    static uint8_t fakeMac[6] = {};
+    static bool initialised   = false;
+    if (!initialised) {
+        uint16_t pid = static_cast<uint16_t>(getpid());
 #ifdef SIM_TX
-    static const uint8_t fakeMac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0x01, 0x01};
+        fakeMac[0] = 0xAA;
+        fakeMac[1] = 0xBB;
+        fakeMac[2] = 0xCC;
+        fakeMac[3] = 0xDD;
 #else
-    static const uint8_t fakeMac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0x02, 0x01};
+        fakeMac[0] = 0xAA;
+        fakeMac[1] = 0xBB;
+        fakeMac[2] = 0xCC;
+        fakeMac[3] = 0xDE;
 #endif
+        fakeMac[4]  = static_cast<uint8_t>(pid >> 8);
+        fakeMac[5]  = static_cast<uint8_t>(pid & 0xFF);
+        initialised = true;
+    }
     memcpy(mac, fakeMac, 6);
 }
 
@@ -228,11 +248,35 @@ static void stdinReaderThread(int fd) {
     }
 }
 
-int main(int, char **) {
+/// Parse command-line arguments:
+///   --rssi <ch>:<dBm>[,<ch>:<dBm>]   Set simulated RSSI per channel
+static void parseArgs(int argc, char **argv) {
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--rssi") == 0 && i + 1 < argc) {
+            ++i;
+            // Parse "ch:rssi" pairs, e.g. "6:-30" or "1:-45,6:-30,11:-70"
+            char *arg = argv[i];
+            while (arg && *arg) {
+                int ch = 0, rssi = 0;
+                if (std::sscanf(arg, "%d:%d", &ch, &rssi) == 2) {
+                    sim_set_channel_rssi(static_cast<uint8_t>(ch), static_cast<int8_t>(rssi));
+                    printf("[SIM] Channel %d RSSI set to %d dBm\n", ch, rssi);
+                }
+                // Advance to next comma-separated pair
+                char *comma = std::strchr(arg, ',');
+                arg         = comma ? comma + 1 : nullptr;
+            }
+        }
+    }
+}
+
+int main(int argc, char **argv) {
     /* Disable buffering on both stdout and stdin so the interactive shell
      * prompt, character echo and input are immediate. */
     setvbuf(stdout, nullptr, _IONBF, 0);
     setvbuf(stdin, nullptr, _IONBF, 0);
+
+    parseArgs(argc, argv);
 
     int inputFd = STDIN_FILENO;
 #ifdef HAS_TERMIOS
