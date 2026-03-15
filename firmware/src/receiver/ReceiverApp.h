@@ -44,6 +44,7 @@
 #include "Shell.h"
 #include "web/ReceiverApi.h"
 
+#include <ChannelScanner.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
@@ -92,6 +93,12 @@ private:
     bool _failsafeActive           = false;
     bool _webConfigMode            = false;
 
+    // Channel discovery state.
+    uint8_t _currentChannel             = 0;
+    bool _discoveryComplete             = false;
+    uint32_t _lastTransmitterActivityMs = 0;
+    uint32_t _lastHeartbeatMs           = 0;
+
     // Vehicle config (loaded from NVS).
     char _vehicleName[kVehicleNameMax] = {};
 
@@ -108,6 +115,17 @@ private:
     void runTelemetryLoop();
     void runWebLoop();
     void runShellLoop();
+
+    // Channel discovery methods.
+    void runChannelDiscovery();
+    void saveChannel(uint8_t channel);
+    uint8_t loadChannel();
+
+    // Transmitter loss detection + rediscovery.
+    void checkTransmitterLoss();
+
+    // Callback for channel migration notification.
+    void onChannelMigration(uint8_t newChannel);
 
     /// Load vehicle name from NVS.
     void loadVehicleName();

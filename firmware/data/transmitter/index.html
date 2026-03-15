@@ -183,10 +183,6 @@
   <label>Device Name</label>
   <input type="text" id="c-devname" maxlength="28">
 
-  <h2>Radio</h2>
-  <label>WiFi Channel (1–13)</label>
-  <input type="number" id="c-radioch" min="1" max="13">
-
   <h2>Battery</h2>
   <label>TX Cells</label>
   <select id="c-txcells">
@@ -266,7 +262,6 @@
         configData = await fetchJson('/api/config');
         const c = configData;
         document.getElementById('c-devname').value = c.device_name || '';
-        document.getElementById('c-radioch').value = c.radio_channel || 1;
         document.getElementById('c-txcells').value = c.tx_cells || 0;
         document.getElementById('c-rxcells').value = c.rx_cells || 0;
 
@@ -345,7 +340,6 @@
 
       const body = {
         device_name: document.getElementById('c-devname').value,
-        radio_channel: parseInt(document.getElementById('c-radioch').value),
         model_type: parseInt(document.getElementById('c-model').value),
         tx_cells: parseInt(document.getElementById('c-txcells').value),
         rx_cells: parseInt(document.getElementById('c-rxcells').value),

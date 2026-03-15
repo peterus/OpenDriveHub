@@ -66,7 +66,7 @@ void ReceiverApi::handleGetStatus(AsyncWebServerRequest *request) {
     const char *state = "disconnected";
     if (_radio.isBound())
         state = "connected";
-    else if (_radio.isAnnouncing())
+    else if (_radio.isPresencing())
         state = "announcing";
     doc["link"]["state"] = state;
     doc["link"]["rssi"]  = _radio.lastRssi();
@@ -97,7 +97,7 @@ void ReceiverApi::handleGetStatus(AsyncWebServerRequest *request) {
 }
 
 void ReceiverApi::handleGetConfig(AsyncWebServerRequest *request) {
-    NvsStore nvs("odh_rx", true);
+    NvsStore nvs("odh", true);
     JsonDocument doc;
 
     doc["vehicle_name"] = nvs.getString("veh_name", "Receiver");
@@ -143,7 +143,7 @@ void ReceiverApi::handlePostConfig(AsyncWebServerRequest *request, const uint8_t
         return;
     }
 
-    NvsStore nvs("odh_rx", false);
+    NvsStore nvs("odh", false);
 
     // Update vehicle name if provided.
     if (doc["vehicle_name"].is<const char *>()) {

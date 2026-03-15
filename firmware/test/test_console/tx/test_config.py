@@ -17,28 +17,25 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""
-sim_build.py – PlatformIO extra_script for the simulation environment.
+"""Transmitter-specific config roundtrip tests."""
 
-Adds the simulation shim include path and compiles the shim source files
-alongside the project's own sources.
-"""
+from __future__ import annotations
 
-Import("env")
+import pytest
 
-import os
+from console import Console
 
-sim_dir = os.path.abspath(os.path.join(env.subst("$PROJECT_DIR"), "sim"))
-lib_dir = os.path.abspath(os.path.join(env.subst("$PROJECT_DIR"), "lib"))
+pytestmark = pytest.mark.tx
 
-# Add shim headers to the include path (highest priority).
-env.Prepend(CPPPATH=[os.path.join(sim_dir, "include")])
 
-# Add shared library headers needed by shim sources.
-env.Append(CPPPATH=[os.path.join(lib_dir, "odh-channel")])
+class TestConfigRoundtripTx:
+    """Verify ``config set`` followed by ``config get`` persists values."""
 
-# Compile the shim source files as part of the build.
-env.BuildSources(
-    os.path.join(env.subst("$BUILD_DIR"), "sim_shim"),
-    os.path.join(sim_dir, "src"),
-)
+    def test_config_set_get_tx_cells(self, console: Console) -> None:
+        """TX: set tx_cells, read it back."""
+        console.send_command("config set tx_cells 3")
+        output = console.send_command("config get")
+        assert "3" in output, (
+            f"tx_cells not set to 3 in config get:\n{output}"
+        )
+        console.send_command("config set tx_cells 0")

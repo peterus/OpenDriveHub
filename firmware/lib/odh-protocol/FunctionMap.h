@@ -259,13 +259,13 @@ inline const char *odh_model_name(uint8_t model) {
 #endif
 }
 
-inline uint8_t odh_default_function_map(uint8_t model, OdhFunctionMapEntry_t *entries) {
+inline uint8_t odh_default_function_map(uint8_t model, FunctionMapEntry *entries) {
     auto map = odh::defaultFunctionMap(model);
-    std::memcpy(entries, map.entries.data(), sizeof(OdhFunctionMapEntry_t) * map.count);
+    std::memcpy(entries, map.entries.data(), sizeof(FunctionMapEntry) * map.count);
     return map.count;
 }
 
-inline uint8_t odh_function_to_channel(const OdhFunctionMapEntry_t *entries, uint8_t count, uint8_t function) {
+inline uint8_t odh_function_to_channel(const FunctionMapEntry *entries, uint8_t count, uint8_t function) {
     for (uint8_t i = 0; i < count; i++) {
         if (entries[i].function == function) {
             return entries[i].channel;
@@ -274,13 +274,13 @@ inline uint8_t odh_function_to_channel(const OdhFunctionMapEntry_t *entries, uin
     return 0xFF;
 }
 
-inline uint8_t odh_channel_to_function(const OdhFunctionMapEntry_t *entries, uint8_t count, uint8_t channel) {
+inline uint8_t odh_channel_to_function(const FunctionMapEntry *entries, uint8_t count, uint8_t channel) {
     for (uint8_t i = 0; i < count; i++) {
         if (entries[i].channel == channel) {
             return entries[i].function;
         }
     }
-    return ODH_FUNC_NONE;
+    return static_cast<uint8_t>(Function::None);
 }
 
 } // namespace odh

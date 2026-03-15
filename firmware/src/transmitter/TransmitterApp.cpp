@@ -29,11 +29,14 @@
 #include <Preferences.h>
 #include <Wire.h>
 
+#include <Channel.h>
+#include <ChannelScanner.h>
 #include <Config.h>
 #include <FunctionMap.h>
 #include <NvsStore.h>
 #include <Protocol.h>
 #include <Shell.h>
+#include <cstdlib>
 
 #ifdef NATIVE_SIM
 #include <WiFi.h>
@@ -156,8 +159,13 @@ void TransmitterApp::begin() {
 
     // Radio
     auto telCb = [this](const TelemetryPacket &pkt) { _telemetry.onPacketReceived(pkt); };
-    if (_radio.begin(config::kRadioWifiChannel, telCb)) {
+    if (_radio.begin(telCb)) {
         Serial.println(F("[ODH] Radio (ESP-NOW) OK"));
+
+        // Run channel acquisition (find or found a channel)
+        runChannelAcquisition();
+
+        Serial.printf("[ODH] Active on channel %u\n", _currentChannel);
         _radio.startScanning();
         Serial.println(F("[ODH] Scanning for vehicles..."));
     } else {
@@ -192,6 +200,134 @@ void TransmitterApp::begin() {
     xTaskCreatePinnedToCore(taskShell, "shell", config::kShellTaskStackWords, this, config::kShellTaskPriority, nullptr, config::kShellTaskCore);
 
     Serial.println(F("[ODH] Setup complete"));
+}
+
+/* ── NVS channel helpers ──────────────────────────────────────────────────── */
+
+uint8_t TransmitterApp::loadChannel() {
+    NvsStore nvs("odh", true);
+    uint8_t ch = nvs.getU8("radio_ch", 0);
+    if (channel::isValidChannel(ch))
+        return ch;
+    return channel::kDefaultChannel;
+}
+
+void TransmitterApp::saveChannel(uint8_t ch) {
+    if (!channel::isValidChannel(ch))
+        return;
+    NvsStore nvs("odh", false);
+    nvs.putU8("radio_ch", ch);
+}
+
+/* ── Channel acquisition ─────────────────────────────────────────────────── */
+
+void TransmitterApp::activateChannel(uint8_t ch) {
+    _currentChannel = ch;
+    _radio.setChannel(ch);
+    saveChannel(ch);
+    _channelActive = true;
+    setupActiveTransmitter();
+}
+
+void TransmitterApp::runChannelAcquisition() {
+    // Wire up the ChannelScanner callbacks
+    ChannelScanner scanner([this](uint8_t ch) -> bool { return _radio.setChannel(ch); }, [this](uint8_t /*ch*/) -> bool { return _radio.sendDiscoveryRequest(); }, [](uint32_t ms) { delay(ms); });
+
+    // Forward DiscoveryResponse to the scanner
+    _radio.onDiscoveryResponse([&scanner](uint8_t ch, int8_t rssi, uint8_t devCount) { scanner.onDiscoveryResponse(ch, rssi, devCount); });
+
+    uint8_t lastCh = loadChannel();
+
+    // Step 1: Quick-check the last known channel from NVS
+    if (channel::isValidChannel(lastCh)) {
+        Serial.printf("[ODH] Trying last known channel %u...\n", lastCh);
+        if (scanner.scanChannel(lastCh).foundTransmitter) {
+            Serial.printf("[ODH] Joined existing transmitter on channel %u\n", lastCh);
+            activateChannel(lastCh);
+            return;
+        }
+    }
+
+    // Step 2: Scan all candidate channels
+    Serial.println(F("[ODH] Scanning channels 1, 6, 11..."));
+    ScanResult results[channel::kCandidateChannelCount];
+    scanner.scanAllChannels(results);
+
+    uint8_t bestCh = ChannelScanner::bestChannel(results);
+
+    if (ChannelScanner::anyTransmitterFound(results)) {
+        Serial.printf("[ODH] Joined existing transmitter on channel %u\n", bestCh);
+        activateChannel(bestCh);
+        return;
+    }
+
+    // Step 3: No other transmitter found – prefer stored channel, then
+    // back off before claiming.
+    if (channel::isValidChannel(lastCh))
+        bestCh = lastCh;
+
+    uint32_t backoff = channel::kFoundingBackoffMinMs + (std::rand() % (channel::kFoundingBackoffMaxMs - channel::kFoundingBackoffMinMs));
+    Serial.printf("[ODH] No TX found – backing off %lu ms before claiming channel %u\n", static_cast<unsigned long>(backoff), bestCh);
+    delay(backoff);
+
+    // One final discovery pass after backoff
+    if (scanner.scanChannel(bestCh).foundTransmitter) {
+        Serial.printf("[ODH] Late discovery – joined transmitter on channel %u\n", bestCh);
+    } else {
+        Serial.printf("[ODH] Founded channel %u\n", bestCh);
+    }
+    activateChannel(bestCh);
+}
+
+void TransmitterApp::setupActiveTransmitter() {
+    // Register DiscoveryRequest callback – auto-reply is handled by radio layer
+    _radio.onDiscoveryRequest([](const uint8_t * /*mac*/, DeviceRole /*role*/) {});
+
+    // Register DiscoveryResponse callback for ongoing awareness
+    _radio.onDiscoveryResponse([](uint8_t /*ch*/, int8_t /*rssi*/, uint8_t /*devCount*/) {});
+}
+
+/* ── rescan() ────────────────────────────────────────────────────────────── */
+
+void TransmitterApp::rescan() {
+    if (_radio.isBound()) {
+        Serial.println(F("[ODH] Cannot rescan while bound"));
+        return;
+    }
+
+    Serial.println(F("[ODH] Rescanning channels..."));
+
+    ChannelScanner scanner([this](uint8_t ch) -> bool { return _radio.setChannel(ch); }, [this](uint8_t /*ch*/) -> bool { return _radio.sendDiscoveryRequest(); }, [](uint32_t ms) { delay(ms); });
+
+    _radio.onDiscoveryResponse([&scanner](uint8_t ch, int8_t rssi, uint8_t devCount) { scanner.onDiscoveryResponse(ch, rssi, devCount); });
+
+    ScanResult results[channel::kCandidateChannelCount];
+    scanner.scanAllChannels(results);
+
+    for (uint8_t i = 0; i < channel::kCandidateChannelCount; ++i) {
+        if (results[i].foundTransmitter) {
+            uint8_t oldCh   = _currentChannel;
+            _currentChannel = results[i].channel;
+
+            if (oldCh != results[i].channel) {
+                // Send migration notification on old channel before switching
+                _radio.setChannel(oldCh);
+                _radio.sendChannelMigration(results[i].channel);
+                delay(10);
+            }
+
+            _radio.setChannel(results[i].channel);
+            saveChannel(results[i].channel);
+            Serial.printf("[ODH] Switched to channel %u (found other TX)\n", results[i].channel);
+            setupActiveTransmitter();
+            return;
+        }
+    }
+
+    // No other TX found – stay on current channel
+    _radio.setChannel(_currentChannel);
+    Serial.println(F("[ODH] No other TX found – staying on current channel"));
+    setupActiveTransmitter();
 }
 
 /* ── taskControl – 50 Hz ─────────────────────────────────────────────────── */
