@@ -70,7 +70,7 @@ echo(str("  Display zone depth:   ", display_zone_depth, " mm"));
 echo(str("  Total depth:          ", total_depth, " mm"));
 echo(str("  Zone height:          ", zone_height, " mm"));
 echo(str("  Module grid:          ", bay_grid_cols, "x", bay_grid_rows,
-         " = ", bay_grid_width, "x", bay_grid_height, " mm"));
+         " = ", bay_grid_width, "x", bay_grid_depth, " mm"));
 echo(str("  Print bed:            ", print_bed_x, "x", print_bed_y, " mm"));
 echo(str("  Each zone fits bed:   ",
     zone_width <= print_bed_x && joy_zone_depth <= print_bed_y &&

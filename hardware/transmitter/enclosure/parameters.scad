@@ -80,7 +80,7 @@ bay_grid_rows     = 3;     // Number of rows (along Y)
 
 // Computed grid dimensions
 bay_grid_width  = bay_grid_cols * bay_unit_size + (bay_grid_cols + 1) * bay_wall;
-bay_grid_height = bay_grid_rows * bay_unit_size + (bay_grid_rows + 1) * bay_wall;
+bay_grid_depth  = bay_grid_rows * bay_unit_size + (bay_grid_rows + 1) * bay_wall;
 
 // --- Display (ILI9341 2.8" TFT LCD, mounted LANDSCAPE) ----------------------
 // In landscape orientation: long edge = X (width), short edge = Y (depth)
@@ -135,7 +135,7 @@ zone_height       = joy_body_height + wall_thickness + 5; // ~42.5mm
 
 // Zone depths (Y axis, front-to-back for each zone)
 joy_zone_depth    = joy_body_width + 20;      // ~70mm
-module_zone_depth = bay_grid_height + 15;     // ~110mm
+module_zone_depth = bay_grid_depth + 15;     // ~110mm
 display_zone_depth = display_pcb_depth + 15;  // ~65mm
 
 // Total transmitter depth
@@ -145,6 +145,12 @@ total_depth = joy_zone_depth + module_zone_depth + display_zone_depth;
 mount_post_dia     = 8.0;     // Outer diameter of mounting post
 mount_post_inset_x = 8.0;     // Inset from zone edge (X)
 mount_post_inset_y = 8.0;     // Inset from zone edge (Y)
+
+// --- Alignment Pins ----------------------------------------------------------
+alignment_pin_dia    = 3.0;   // Diameter of alignment pins
+alignment_pin_height = 4.0;   // Height of alignment pins
+alignment_hole_dia   = 3.4;   // Diameter of alignment holes (with tolerance)
+alignment_hole_depth = 4.5;   // Depth of alignment holes
 
 // --- Cable Routing -----------------------------------------------------------
 cable_slot_width   = 10.0;    // Width of cable routing slots between zones

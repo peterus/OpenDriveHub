@@ -59,6 +59,13 @@ module display_zone() {
                         cube([display_pcb_width - 2, display_pcb_depth - 2,
                               ledge_h + 0.2]);
                 }
+
+            // Mounting posts at front edge (through-holes for module zone screws)
+            front_mounts = zone_mount_positions(w, d);
+            for (pos = front_mounts) {
+                translate([pos[0], pos[1], 0])
+                    mounting_post_through(h - 1);
+            }
         }
 
         // Grooves on front edge (receive module zone tongues)
@@ -73,11 +80,14 @@ module display_zone() {
                   display_pcb_depth + 2 * fit_tolerance,
                   display_module_thick + 3]);
 
-        // Display viewing window (through the top wall)
-        translate([lcd_x + display_view_offset_x,
-                   lcd_y + display_view_offset_y,
+        // Display viewing window (through the top wall, reduced by bezel
+        // overlap so the LCD is held in place by the frame)
+        translate([lcd_x + display_view_offset_x + bezel_overlap,
+                   lcd_y + display_view_offset_y + bezel_overlap,
                    -0.1])
-            cube([display_view_width, display_view_depth, h + 0.2]);
+            cube([display_view_width - 2 * bezel_overlap,
+                  display_view_depth - 2 * bezel_overlap,
+                  h + 0.2]);
 
         // LCD mounting screw holes
         hole_positions = [

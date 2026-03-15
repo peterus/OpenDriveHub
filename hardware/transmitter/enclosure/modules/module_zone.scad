@@ -39,7 +39,7 @@ module module_zone() {
 
     // Grid position (centered on X, centered on Y)
     grid_w = bay_grid_width;
-    grid_d = bay_grid_height;
+    grid_d = bay_grid_depth;
     grid_x = (w - grid_w) / 2;
     grid_y = (d - grid_d) / 2;
 
@@ -57,6 +57,20 @@ module module_zone() {
             for (tx = t_positions) {
                 translate([0, d, 0])
                     tongue(tx);
+            }
+
+            // Mounting posts at front edge (through-holes for joystick zone screws)
+            front_mounts = zone_mount_positions(w, d);
+            for (pos = front_mounts) {
+                translate([pos[0], pos[1], 0])
+                    mounting_post_through(h - 1);
+            }
+
+            // Mounting posts at rear edge (heat-set inserts for display zone)
+            rear_mounts = zone_mount_positions(w, d);
+            for (pos = rear_mounts) {
+                translate([pos[0], d - pos[1], 0])
+                    mounting_post(h - 1);
             }
         }
 

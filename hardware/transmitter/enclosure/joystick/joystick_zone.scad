@@ -70,6 +70,13 @@ module joystick_zone() {
                             cylinder(d = joy_panel_cutout, h = 4.2);
                     }
             }
+
+            // Mounting posts at rear edge (heat-set inserts for module zone)
+            mount_positions = zone_mount_positions(w, d);
+            for (pos = mount_positions) {
+                translate([pos[0], pos[1], 0])
+                    mounting_post(h - 1);
+            }
         }
 
         // Joystick panel cutouts (through the top wall)
@@ -119,7 +126,7 @@ module joystick_zone() {
 
 // Grip shape: extends downward from the zone side
 module _grip_shape(is_right) {
-    mirror_x = is_right ? 0 : 1;
+    mirror_x = is_right ? 1 : 0;
     mirror([mirror_x, 0, 0])
     translate([0, 0, 0]) {
         hull() {
@@ -147,6 +154,31 @@ module _joy_placeholder() {
     color([0.5, 0.5, 0.5, 0.5])
         translate([0, 0, -joy_body_height])
             cylinder(d = joy_body_width * 0.8, h = joy_body_height);
+}
+
+// Battery cover: slides or clips into the bottom opening of the joystick zone.
+// Print this part separately.
+module battery_cover() {
+    cover_tol  = 0.3;   // Fit tolerance on each side
+    lip        = 1.5;   // Lip that sits inside the cavity to retain the cover
+    cover_w    = battery_width - 2 * cover_tol;
+    cover_l    = battery_length - 2 * cover_tol;
+    cover_h    = wall_thickness;
+
+    difference() {
+        union() {
+            // Main plate (flush with bottom of joystick zone)
+            rounded_cube([cover_w, cover_l, cover_h], corner_radius);
+
+            // Retention lip (sits inside the battery opening)
+            translate([lip, lip, cover_h])
+                cube([cover_w - 2 * lip, cover_l - 2 * lip, lip]);
+        }
+
+        // Finger-pull recess for easy removal
+        translate([cover_w / 2, cover_l / 2, -0.1])
+            cylinder(d = 15, h = cover_h * 0.6);
+    }
 }
 
 // Preview
