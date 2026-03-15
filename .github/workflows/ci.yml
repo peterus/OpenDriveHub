@@ -270,6 +270,8 @@ jobs:
             -I firmware/lib/odh-radio \
             -I firmware/lib/odh-telemetry \
             -I firmware/lib/odh-web \
+            -I firmware/lib/odh-shell \
+            -I firmware/lib/odh-channel \
             firmware/src \
             firmware/lib
 

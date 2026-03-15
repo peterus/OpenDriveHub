@@ -27,6 +27,10 @@
 #include <algorithm>
 #include <cstring>
 
+#ifndef NATIVE_SIM
+#include <esp_wifi.h>
+#endif
+
 namespace odh {
 
 TransmitterRadioLink *TransmitterRadioLink::sInstance = nullptr;
@@ -39,8 +43,7 @@ TransmitterRadioLink::TransmitterRadioLink() = default;
 
 // ── Initialisation ──────────────────────────────────────────────────────
 
-bool TransmitterRadioLink::begin(uint8_t wifiChannel, TelemetryCallback callback) {
-    _wifiChannel       = wifiChannel;
+bool TransmitterRadioLink::begin(TelemetryCallback callback) {
     _telemetryCallback = std::move(callback);
     sInstance          = this;
 
@@ -56,6 +59,73 @@ bool TransmitterRadioLink::begin(uint8_t wifiChannel, TelemetryCallback callback
 
     _ready = true;
     return true;
+}
+
+// ── Channel management ──────────────────────────────────────────────────
+
+bool TransmitterRadioLink::setChannel(uint8_t channel) {
+    _wifiChannel = channel;
+    esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+    return true;
+}
+
+// ── Discovery ───────────────────────────────────────────────────────────
+
+bool TransmitterRadioLink::sendDiscoveryRequest() {
+    if (!_ready)
+        return false;
+
+    addPeer(kBroadcastMac);
+
+    DiscoveryRequestPacket pkt{};
+    fillHeader(pkt, PacketType::DiscoveryRequest);
+    esp_read_mac(pkt.mac, ESP_MAC_WIFI_STA);
+    pkt.role = static_cast<uint8_t>(DeviceRole::Transmitter);
+    setChecksum(pkt);
+
+    auto rc = esp_now_send(kBroadcastMac, reinterpret_cast<uint8_t *>(&pkt), sizeof(pkt));
+    return rc == ESP_OK;
+}
+
+bool TransmitterRadioLink::sendDiscoveryResponse(uint8_t channel) {
+    if (!_ready)
+        return false;
+
+    addPeer(kBroadcastMac);
+
+    DiscoveryResponsePacket pkt{};
+    fillHeader(pkt, PacketType::DiscoveryResponse);
+    esp_read_mac(pkt.mac, ESP_MAC_WIFI_STA);
+    pkt.channel      = channel;
+    pkt.device_count = _discoveredCount;
+    setChecksum(pkt);
+
+    auto rc = esp_now_send(kBroadcastMac, reinterpret_cast<uint8_t *>(&pkt), sizeof(pkt));
+    return rc == ESP_OK;
+}
+
+bool TransmitterRadioLink::sendChannelMigration(uint8_t newChannel) {
+    if (!_ready)
+        return false;
+
+    addPeer(kBroadcastMac);
+
+    ChannelMigrationPacket pkt{};
+    fillHeader(pkt, PacketType::ChannelMigration);
+    esp_read_mac(pkt.mac, ESP_MAC_WIFI_STA);
+    pkt.new_channel = newChannel;
+    setChecksum(pkt);
+
+    auto rc = esp_now_send(kBroadcastMac, reinterpret_cast<uint8_t *>(&pkt), sizeof(pkt));
+    return rc == ESP_OK;
+}
+
+void TransmitterRadioLink::onDiscoveryResponse(DiscoveryResponseCallback cb) {
+    _discoveryResponseCallback = std::move(cb);
+}
+
+void TransmitterRadioLink::onDiscoveryRequest(DiscoveryRequestCallback cb) {
+    _discoveryRequestCallback = std::move(cb);
 }
 
 // ── Scanning ────────────────────────────────────────────────────────────
@@ -190,12 +260,36 @@ void TransmitterRadioLink::handleReceive(const uint8_t * /*mac*/, const uint8_t 
 
     const auto type = static_cast<PacketType>(data[3]);
 
-    // ── Announce packets (while scanning) ───────────────────────────
-    if (type == PacketType::Announce && _scanning) {
-        if (len < static_cast<int>(sizeof(AnnouncePacket)))
+    // ── DiscoveryRequest (answer if we're an active transmitter) ─
+    if (type == PacketType::DiscoveryRequest) {
+        if (len < static_cast<int>(sizeof(DiscoveryRequestPacket)))
+            return;
+        const auto *rp = reinterpret_cast<const DiscoveryRequestPacket *>(data);
+        if (_discoveryRequestCallback) {
+            _discoveryRequestCallback(rp->mac, static_cast<DeviceRole>(rp->role));
+        }
+        // Auto-reply with DiscoveryResponse
+        sendDiscoveryResponse(_wifiChannel);
+        return;
+    }
+
+    // ── DiscoveryResponse (from another transmitter during scan) ─
+    if (type == PacketType::DiscoveryResponse) {
+        if (len < static_cast<int>(sizeof(DiscoveryResponsePacket)))
+            return;
+        const auto *dp = reinterpret_cast<const DiscoveryResponsePacket *>(data);
+        if (_discoveryResponseCallback) {
+            _discoveryResponseCallback(dp->channel, _lastRssi, dp->device_count);
+        }
+        return;
+    }
+
+    // ── Presence packets (while not bound) ────────────────────────
+    if (type == PacketType::ReceiverPresence && !_bound) {
+        if (len < static_cast<int>(sizeof(ReceiverPresencePacket)))
             return;
 
-        const auto *ap = reinterpret_cast<const AnnouncePacket *>(data);
+        const auto *ap = reinterpret_cast<const ReceiverPresencePacket *>(data);
 
         // Update existing entry or add new one.
         for (uint8_t i = 0; i < _discoveredCount; i++) {
@@ -203,6 +297,7 @@ void TransmitterRadioLink::handleReceive(const uint8_t * /*mac*/, const uint8_t 
                 _discovered[i].modelType  = ap->model_type;
                 _discovered[i].lastSeenMs = millis();
                 _discovered[i].rssi       = _lastRssi;
+                _discovered[i].channel    = _wifiChannel;
                 std::memset(_discovered[i].name, 0, kVehicleNameMax);
                 std::strncpy(_discovered[i].name, ap->name, kVehicleNameMax - 1);
                 return;
@@ -215,6 +310,7 @@ void TransmitterRadioLink::handleReceive(const uint8_t * /*mac*/, const uint8_t 
             v.modelType  = ap->model_type;
             v.lastSeenMs = millis();
             v.rssi       = _lastRssi;
+            v.channel    = _wifiChannel;
             v.valid      = true;
             std::memset(v.name, 0, kVehicleNameMax);
             std::strncpy(v.name, ap->name, kVehicleNameMax - 1);

@@ -43,6 +43,7 @@
 #include "web/TransmitterApi.h"
 
 #include <BatteryMonitor.h>
+#include <ChannelScanner.h>
 #include <Config.h>
 #include <OdhWebServer.h>
 #include <Shell.h>
@@ -57,6 +58,9 @@ namespace odh {
 class TransmitterApp {
 public:
     void begin();
+
+    /// Rescan channels for other transmitters. Only callable when not bound.
+    void rescan();
 
     // ── Accessors for shell commands ────────────────────────────────
 
@@ -116,8 +120,19 @@ private:
     SemaphoreHandle_t _i2cMutex = nullptr;
     SemaphoreHandle_t _funcMux  = nullptr;
 
+    // Channel state
+    uint8_t _currentChannel = 0;
+    bool _channelActive     = false;
+
     // NVS helpers
     void loadInputMap(uint8_t model);
+
+    // Channel discovery
+    void runChannelAcquisition();
+    void activateChannel(uint8_t ch);
+    void setupActiveTransmitter();
+    void saveChannel(uint8_t channel);
+    uint8_t loadChannel();
 
     // FreeRTOS task bodies
     static void taskControl(void *param);

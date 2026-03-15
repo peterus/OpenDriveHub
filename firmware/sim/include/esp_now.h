@@ -22,11 +22,9 @@
 /**
  * esp_now.h – Simulation shim using UDP sockets.
  *
- * ESP-NOW packets are sent/received over localhost UDP:
- *   - Transmitter listens on port 6001, sends to port 6002
- *   - Receiver   listens on port 6002, sends to port 6001
- *
- * Compile with -DSIM_TX for the transmitter role or -DSIM_RX for receiver.
+ * Each WiFi channel maps to a shared UDP port (port = 7000 + channel).
+ * All devices on the same channel listen and send on the same port.
+ * Self-packets are filtered by comparing the source MAC.
  */
 
 #ifndef SIM_ESP_NOW_H
@@ -66,12 +64,14 @@ bool esp_now_is_peer_exist(const uint8_t *peer_addr);
 
 /* ── Simulation control ─────────────────────────────────────────────────── */
 
-#ifdef SIM_TX
-#define SIM_LISTEN_PORT 6001
-#define SIM_SEND_PORT 6002
-#else
-#define SIM_LISTEN_PORT 6002
-#define SIM_SEND_PORT 6001
-#endif
+/// Set the simulated WiFi channel. Switches the underlying UDP port.
+void sim_set_wifi_channel(uint8_t channel);
+
+/// Get the current simulated WiFi channel.
+uint8_t sim_get_wifi_channel();
+
+/// Set the simulated RSSI (dBm) for a specific WiFi channel.
+/// Use this to influence which channel the scanner prefers.
+void sim_set_channel_rssi(uint8_t channel, int8_t rssi);
 
 #endif /* SIM_ESP_NOW_H */
