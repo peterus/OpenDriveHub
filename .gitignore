@@ -17,3 +17,6 @@ fp-info-cache
 
 # Python bytecode
 __pycache__
+
+# OpenSCAD render output (regenerable via openscad-mcp render_perspectives)
+renders/

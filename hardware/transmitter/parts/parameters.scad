@@ -5,7 +5,7 @@
 $fn = 64;
 
 // --- Printer constraints ---
-PRINT_BED      = [220, 220];   // [x, y] build area (mm) — adjust to your printer
+PRINT_BED      = [200, 200];   // primary printer; 220x220 and 300x300 also available
 NOZZLE_DIAM    = 0.4;
 MIN_WALL       = 1.2;          // 3 perimeters @ 0.4mm
 LAYER_H        = 0.2;
