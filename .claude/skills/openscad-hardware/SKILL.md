@@ -57,7 +57,9 @@ If any step fails, fix before proceeding. Declaring done without this gate is th
 
 **Via MCP (preferred)** — `render_perspectives` returns 7 PNGs in one call; `render_single` for custom camera; `validate_scad` for syntax; `analyze_model` returns bounding box + triangle count (catches dimensional bugs that visual inspection misses — always sanity-check dimensions against what you expect).
 
-MCP gotcha: pass `output_format="file_path"` explicitly. The default `"auto"` embeds PNGs as base64 which blows the token budget with >1 view.
+MCP gotchas:
+- Pass `output_format="file_path"` explicitly. The default `"auto"` embeds PNGs as base64 which blows the token budget with >1 view.
+- The MCP caches rendered PNGs by scad-file hash + parameters. Source-code changes DO invalidate it — but if a render looks stale after an edit, call `mcp__openscad__clear_cache` to force a full rebuild. Symptom: file size stays small / unchanged despite geometry changes.
 
 **Direct CLI fallback:**
 ```bash
