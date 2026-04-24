@@ -20,6 +20,8 @@ use <encoder.scad>
 use <button_illuminated.scad>
 use <button_tact.scad>
 use <display.scad>
+use <pcb_subpanel.scad>
+use <pcb_main.scad>
 
 // =============================================================================
 // Panel geometry
@@ -81,6 +83,17 @@ NAV_BTN_MID_POS    = [ 0,               NAV_BTN_Y];
 NAV_BTN_RIGHT_POS  = [ NAV_BTN_SPACING, NAV_BTN_Y];
 
 // =============================================================================
+// PCB depths (Z behind panel face). Each sub-PCB sits at its dominant
+// component's body-bottom level. Main PCB sits behind the display so the
+// display module's pin header plugs directly into it.
+// =============================================================================
+SUBPCB_Z_TOGGLE  = -13;     // toggle body bottom
+SUBPCB_Z_ILLUM   = -10;     // illuminated-button body bottom
+SUBPCB_Z_ENCODER = -6.5;    // encoder body bottom
+SUBPCB_Z_NAV     = -3.5;    // tact body bottom (nav PCB sits in front of encoder PCB)
+MAIN_PCB_Z       = -19.15;  // main PCB center, header top meets display pin tips at z=-14.1
+
+// =============================================================================
 // Layout module
 // =============================================================================
 module transmitter_layout_front() {
@@ -124,12 +137,41 @@ module transmitter_layout_front() {
         button_tact(anchor="panel");
     translate([NAV_BTN_RIGHT_POS.x, NAV_BTN_RIGHT_POS.y, 0])
         button_tact(anchor="panel");
+
+    // ----- Sub-panel PCBs at their respective depths -----
+    if (SHOW_PCBS) {
+        // 2x toggle PCBs (left/right, centered on each toggle cluster)
+        translate([-TOGGLE_CLUSTER_OFF, TOGGLE_Y, SUBPCB_Z_TOGGLE])
+            subpanel_pcb_toggle3();
+        translate([ TOGGLE_CLUSTER_OFF, TOGGLE_Y, SUBPCB_Z_TOGGLE])
+            subpanel_pcb_toggle3();
+
+        // 2x illuminated PCBs (left/right, centered on each button cluster)
+        translate([-ILLUM_BTN_CLUSTER, ILLUM_BTN_Y, SUBPCB_Z_ILLUM])
+            subpanel_pcb_illum3();
+        translate([ ILLUM_BTN_CLUSTER, ILLUM_BTN_Y, SUBPCB_Z_ILLUM])
+            subpanel_pcb_illum3();
+
+        // 2x encoder PCBs (one per encoder) + 1x nav PCB. Splitting the
+        // encoders keeps the central nav-PCB area clear in XY.
+        translate([ENCODER_LEFT_POS.x,  ENCODER_LEFT_POS.y,  SUBPCB_Z_ENCODER])
+            subpanel_pcb_encoder1();
+        translate([ENCODER_RIGHT_POS.x, ENCODER_RIGHT_POS.y, SUBPCB_Z_ENCODER])
+            subpanel_pcb_encoder1();
+        translate([0, NAV_BTN_Y, SUBPCB_Z_NAV])
+            subpanel_pcb_nav3();
+
+        // Main PCB behind the display (display plugs directly into its header)
+        translate([DISPLAY_POS.x, DISPLAY_POS.y, MAIN_PCB_Z])
+            pcb_main();
+    }
 }
 
 // =============================================================================
 // Standalone preview
 // =============================================================================
 SHOW_STANDALONE = true;
+SHOW_PCBS       = true;   // include sub-panel + main PCBs in preview
 
 if (SHOW_STANDALONE) {
     transmitter_layout_front();
