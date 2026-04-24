@@ -17,19 +17,26 @@ You (the LLM) cannot see 3D shapes directly. This skill closes the gap with thre
 - Any work under `hardware/`
 - User asks to model a physical part, enclosure, bracket, or mount
 
-## Required workflow
+## The render-check gate (non-negotiable sequence)
+
+After every geometric change, run this exact sequence before reporting progress:
+
+1. **`validate_scad`** — catches syntax errors and deprecated calls in a few ms.
+2. **`analyze_model`** — exports STL via CGAL internally, so success here means the geometry is manifold. **This is your CGAL gate** — if it succeeds, preview-only CSG problems (non-manifold, zero-thickness, bad `difference`) are ruled out. Also: *always* cross-check the returned bounding-box dimensions against the numbers you expect from `parameters.scad`. Mismatches >0.1mm mean overlapping or gapped solids (see `pitfalls.md` #10).
+3. **`render_perspectives`** with `output_format="file_path"` — 7 views, iso + 6 orthogonal.
+4. **`Read` the PNGs** — you are multimodal; look at each one. Describe what you see back to the user. "It looks correct" without a Read call is a lie.
+
+If any step fails, fix before proceeding. Declaring done without this gate is the #1 bug source.
+
+## Workflow
 
 1. **Check `parameters.scad`** in the relevant directory. If it doesn't exist, create it and put every numeric constant there — nothing hardcoded in part files.
 2. **Use BOSL2 for all composition**. `include <BOSL2/std.scad>` (not `use` — BOSL2's anchor constants `TOP`/`BOTTOM`/`LEFT`/... require `include`). Prefer `attach(TOP) cuboid(...)` over `translate([...])` — any time you find yourself writing a `translate` with more than one non-zero offset, stop and ask whether `attach()` / `position()` expresses it better. See `references/libraries.md`.
-3. **Use NopSCADlib for standard parts**: screws, heat-set inserts, boards, displays, connectors. Do not re-model what nophead already modeled correctly. See `references/libraries.md`.
-4. **Render and look** after every geometric change:
-   - `render_perspectives` via MCP (iso + 6 orthographic) — preferred
-   - `Read` each returned PNG and describe what you see
-   - For internal geometry, add a section view (`difference()` with a half-space)
-   - For assemblies, add an explode parameter that separates parts along Z
-5. **Validate** before marking done:
-   - `validate_scad` (MCP) or a full CGAL render catches non-manifold / CSG issues that preview misses
-   - `analyze_model` (MCP) gives bounding box — cross-check against print bed
+3. **Use NopSCADlib for standard parts**: screws, heat-set inserts, boards, displays, connectors. Do not re-model what nophead already modeled correctly.
+4. **Use `utils.scad` for colors and helpers** — `COLOR_METAL`, `COLOR_PCB`, etc. for consistent vitamin rendering; `print_bed_check()` in each printed part; `explode_shift()` in assemblies.
+5. **Internal geometry** — when a part has pockets, bosses, or ribs, render a section view. Easiest: BOSL2's `back_half()`, `left_half()`, or `bottom_half()` wrapped around your part module — see `references/libraries.md`.
+6. **Iterating on a part** — when changing a part that already renders, use MCP `compare_renders` to produce a side-by-side before/after. Essential when the user says "move it 5mm" and you need to verify the delta actually landed.
+7. Run the render-check gate (above).
 
 ## Library policy
 

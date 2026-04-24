@@ -43,6 +43,23 @@ cuboid([40,40,10]) {
 - `grid_copies(n=[nx,ny], spacing=[sx,sy])` — 2D grid
 - `mirror_copy(v=[1,0,0])` — keep original + mirror
 
+### Section views (see inside a part)
+
+Wrap the part in one of these to see its internal geometry without extra geometry code:
+
+- `back_half()` — shows only +Y half (cut along XZ plane through origin)
+- `front_half()` — shows only -Y half
+- `left_half()`, `right_half()` — cut along YZ plane
+- `top_half()`, `bottom_half()` — cut along XY plane
+- All accept `s=size` (cube size of cut plane, default 1000) and `cp=point` to shift the cut plane
+
+```openscad
+// Render full part normally, or sliced down the middle for inspection
+SHOW_SECTION = false;
+if (SHOW_SECTION) back_half() my_part();
+else my_part();
+```
+
 ### Transforms (when anchors don't fit)
 
 - `up(z)`, `down(z)`, `left(x)`, `right(x)`, `fwd(y)`, `back(y)` — readable single-axis translate

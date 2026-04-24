@@ -13,6 +13,7 @@
 
 include <BOSL2/std.scad>
 include <parameters.scad>
+include <utils.scad>
 
 // ----- JH-D400X-R4 nominal dimensions (verify) -----
 JS_BASE          = [38, 38];     // base plate footprint (mm)
@@ -66,37 +67,37 @@ module jh_d400x_r4(anchor=CENTER, spin=0, orient=UP) {
 
 module _jh_d400x_r4_geometry() {
     // Pot body (below panel, attached to underside of base plate)
-    color("#303030")
+    color(COLOR_PLASTIC)
         down(JS_BASE_THICK + JS_BODY_H)
             cyl(d=JS_BODY_D, l=JS_BODY_H, anchor=BOTTOM);
 
     // Pin header block (below body)
-    color("#c0c060")
+    color(COLOR_BRASS)
         down(JS_BASE_THICK + JS_BODY_H + JS_PIN_BLOCK.z)
             cuboid(JS_PIN_BLOCK, anchor=BOTTOM);
 
     // Base plate (panel mating face on top)
-    color("#202020")
+    color(COLOR_PLASTIC)
         cuboid([JS_BASE.x, JS_BASE.y, JS_BASE_THICK], anchor=TOP) {
             // Mounting holes rendered as darker pits for visualization
             for (sx = [-1, 1], sy = [-1, 1])
                 attach(BOTTOM)
                     translate([sx*JS_MOUNT_PCD.x/2, sy*JS_MOUNT_PCD.y/2, 0])
-                        color("#808080") cyl(d=JS_MOUNT_HOLE_D, l=JS_BASE_THICK + 0.2, anchor=CENTER);
+                        color(COLOR_METAL) cyl(d=JS_MOUNT_HOLE_D, l=JS_BASE_THICK + 0.2, anchor=CENTER);
         }
 
     // Boot (rubber shroud above base)
-    color("#404040")
+    color(COLOR_RUBBER)
         up(JS_BOOT_H/2)
             cyl(d1=JS_BOOT_D, d2=JS_BOOT_D*0.7, l=JS_BOOT_H, anchor=CENTER);
 
     // Metal shaft
-    color("#c0c0c0")
+    color(COLOR_METAL)
         up(JS_BOOT_H + JS_SHAFT_L/2)
             cyl(d=JS_SHAFT_D, l=JS_SHAFT_L, anchor=CENTER);
 
     // Ball knob
-    color("#101010")
+    color(COLOR_PLASTIC)
         up(JS_BOOT_H + JS_SHAFT_L + JS_KNOB_H/2)
             sphere(d=JS_KNOB_D);
 }
@@ -120,12 +121,21 @@ module jh_d400x_r4_panel_cutout(panel_thick=2, bolt_clear=true) {
 }
 
 // -----------------------------------------------------------------------------
-// Standalone preview when this file is opened directly.
+// Standalone preview — override these via MCP `variables` or OpenSCAD -D flag.
 // -----------------------------------------------------------------------------
-jh_d400x_r4();
+SHOW_STANDALONE = true;   // render the joystick (disable when `use`ing this file)
+SHOW_SECTION    = false;  // slice through with back_half() to see cross-section
+SHOW_MOCK_PANEL = true;   // draw the ghost panel around the base for context
 
-// Visualize a mock panel with the cutout applied:
-%difference() {
-    up(-0.1) cuboid([JS_BASE.x + 20, JS_BASE.y + 20, 2], anchor=BOTTOM);
-    up(-0.1) jh_d400x_r4_panel_cutout(panel_thick=2);
+if (SHOW_STANDALONE) {
+    if (SHOW_SECTION)
+        back_half(s=200) jh_d400x_r4();
+    else
+        jh_d400x_r4();
+
+    if (SHOW_MOCK_PANEL && !SHOW_SECTION)
+        %difference() {
+            up(-0.1) cuboid([JS_BASE.x + 20, JS_BASE.y + 20, 2], anchor=BOTTOM);
+            up(-0.1) jh_d400x_r4_panel_cutout(panel_thick=2);
+        }
 }
