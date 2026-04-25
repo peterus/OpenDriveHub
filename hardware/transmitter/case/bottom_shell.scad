@@ -116,36 +116,43 @@ module case_screw_boss_bottom() {
     }
 }
 
+// Outer prismoid + back-panel rounding. Shared between the shell base and
+// the clipping mask so boss fins follow the wall taper at every Z level.
+module case_bottom_outer() {
+    diff()
+    translate([0, 0, -BOTTOM_DEPTH])
+        prismoid(
+            size1=[BOT_BACK_W,  BOT_BACK_H ],
+            size2=[BOT_FRONT_W, BOT_FRONT_H],
+            h=BOTTOM_DEPTH,
+            rounding=CORNER_R,
+            anchor=BOTTOM
+        )
+        {
+            edge_profile([BOT])
+                mask2d_roundover(r=TOP_EDGE_R);
+        };
+}
+
+module case_bottom_cavity() {
+    translate([0, 0, -BOTTOM_DEPTH + PANEL_T])
+        prismoid(
+            size1=[BOT_BACK_W  - 2*WALL_T, BOT_BACK_H  - 2*WALL_T],
+            size2=[BOT_FRONT_W - 2*WALL_T, BOT_FRONT_H - 2*WALL_T],
+            h=BOTTOM_DEPTH - PANEL_T + 0.2,
+            rounding=max(CORNER_R - WALL_T, 0.5),
+            anchor=BOTTOM
+        );
+}
+
 // =============================================================================
 module bottom_shell() {
     difference() {
         union() {
-            // Hollow shell: outer tapered prismoid minus inner cavity.
+            // Hollow shell.
             difference() {
-                // Outer with rounded back panel
-                diff()
-                translate([0, 0, -BOTTOM_DEPTH])
-                    prismoid(
-                        size1=[BOT_BACK_W,  BOT_BACK_H ],
-                        size2=[BOT_FRONT_W, BOT_FRONT_H],
-                        h=BOTTOM_DEPTH,
-                        rounding=CORNER_R,
-                        anchor=BOTTOM
-                    )
-                    {
-                        edge_profile([BOT])
-                            mask2d_roundover(r=TOP_EDGE_R);
-                    };
-
-                // Inner cavity
-                translate([0, 0, -BOTTOM_DEPTH + PANEL_T])
-                    prismoid(
-                        size1=[BOT_BACK_W  - 2*WALL_T, BOT_BACK_H  - 2*WALL_T],
-                        size2=[BOT_FRONT_W - 2*WALL_T, BOT_FRONT_H - 2*WALL_T],
-                        h=BOTTOM_DEPTH - PANEL_T + 0.2,
-                        rounding=max(CORNER_R - WALL_T, 0.5),
-                        anchor=BOTTOM
-                    );
+                case_bottom_outer();
+                case_bottom_cavity();
             }
 
             // 4 corner bosses on the back-panel-interior face.
@@ -159,16 +166,18 @@ module bottom_shell() {
             translate([BATT_POS_X, BATT_POS_Y, -BOTTOM_DEPTH + PANEL_T])
                 batt_slot_walls();
 
-            // 4 case-corner bosses with M3 screw clearance for fastening
-            // the bottom shell to the top shell. Rotation aims the
-            // boss-internal +X/+Y fins toward the corresponding case
-            // corner's walls.
-            for (sx = [-1, 1], sy = [-1, 1])
-                translate([sx*CASE_BOSS_OFFSET_X,
-                           sy*CASE_BOSS_OFFSET_Y,
-                           -BOTTOM_DEPTH + PANEL_T])
-                    rotate([0, 0, atan2(sy, sx) - 45])
-                        case_screw_boss_bottom();
+            // Case-corner bosses + overlength fins, clipped to the outer
+            // prismoid so the fins follow the wall taper and corner
+            // rounding precisely.
+            intersection() {
+                case_bottom_outer();
+                for (sx = [-1, 1], sy = [-1, 1])
+                    translate([sx*CASE_BOSS_OFFSET_X,
+                               sy*CASE_BOSS_OFFSET_Y,
+                               -BOTTOM_DEPTH + PANEL_T])
+                        rotate([0, 0, atan2(sy, sx) - 45])
+                            case_screw_boss_bottom();
+            }
         }
 
         // ----- Subtractions on the back panel -----

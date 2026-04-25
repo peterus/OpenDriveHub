@@ -50,61 +50,61 @@ module case_screw_boss_top() {
     }
 }
 
+// Outer prismoid + top-edge rounding. Used both as the shell base and as
+// a clipping mask so boss fins follow the wall taper at every Z level.
+// IMPORTANT: this uses tagged geometry (BOSL2 diff() + edge_profile). It
+// renders correctly in F6 (CGAL) and via openscad-mcp / openscad-cli. In
+// F5 (OpenCSG preview) the mask geometry shows as a translucent overlay
+// rather than being subtracted. Always use F6 to inspect the real result.
+module case_top_outer() {
+    diff()
+    translate([0, 0, PANEL_T])
+        prismoid(
+            size1=[CASE_W,              CASE_H            ],   // mating rim, BIG
+            size2=[CASE_W - 2*TAPER_X, CASE_H - 2*TAPER_Y],   // front panel, SMALL
+            h=TOP_DEPTH,
+            rounding=CORNER_R,
+            anchor=TOP
+        )
+        {
+            edge_profile([TOP])
+                mask2d_roundover(r=TOP_EDGE_R);
+        };
+}
+
+module case_top_cavity() {
+    translate([0, 0, 0.1])
+        prismoid(
+            size1=[CASE_W - 2*WALL_T, CASE_H - 2*WALL_T],
+            size2=[CASE_W - 2*TAPER_X - 2*WALL_T,
+                   CASE_H - 2*TAPER_Y - 2*WALL_T],
+            h=TOP_DEPTH - PANEL_T + 0.2,
+            rounding=max(CORNER_R - WALL_T, 0.5),
+            anchor=TOP
+        );
+}
+
 // =============================================================================
 module shell_top() {
-    // Outer = tapered prismoid (rounded vertical corners) with a roundover
-    // applied to its 4 top-face edges via BOSL2 diff() + edge_profile().
-    //
-    // IMPORTANT: this uses tagged geometry. It renders correctly in F6
-    // (CGAL render) and via openscad-mcp / openscad-cli. In F5 (OpenCSG
-    // preview) the mask geometry shows as a translucent overlay rather
-    // than being subtracted. Always use F6 to inspect the real result.
-
     difference() {
         union() {
-            // Hollow outer shell — the cavity must be cut BEFORE the bosses
-            // are unioned in, otherwise it would eat them.
+            // Hollow outer shell.
             difference() {
-                // Outer: prismoid where the BIG end is at the bottom (mating
-                // rim) and the SMALL end is at the top (front panel). The
-                // case bulges out at the middle (mating) and tapers inward
-                // toward the panel face — gives the "barrel" silhouette.
-                diff()
-                translate([0, 0, PANEL_T])
-                    prismoid(
-                        size1=[CASE_W,              CASE_H            ],   // mating rim, BIG
-                        size2=[CASE_W - 2*TAPER_X, CASE_H - 2*TAPER_Y],   // front panel, SMALL
-                        h=TOP_DEPTH,
-                        rounding=CORNER_R,
-                        anchor=TOP
-                    )
-                    {
-                        edge_profile([TOP])
-                            mask2d_roundover(r=TOP_EDGE_R);
-                    };
-
-                // Inner cavity — same taper, smaller by wall thickness.
-                translate([0, 0, 0.1])
-                    prismoid(
-                        size1=[CASE_W - 2*WALL_T, CASE_H - 2*WALL_T],
-                        size2=[CASE_W - 2*TAPER_X - 2*WALL_T,
-                               CASE_H - 2*TAPER_Y - 2*WALL_T],
-                        h=TOP_DEPTH - PANEL_T + 0.2,
-                        rounding=max(CORNER_R - WALL_T, 0.5),
-                        anchor=TOP
-                    );
+                case_top_outer();
+                case_top_cavity();
             }
 
-            // 4 corner bosses standing on the mating face. They merge into
-            // the side wall near the panel face for stability. The rotation
-            // aims the boss-internal +X/+Y fins toward the corresponding
-            // case-corner walls.
-            for (sx = [-1, 1], sy = [-1, 1])
-                translate([sx*CASE_BOSS_OFFSET_X,
-                           sy*CASE_BOSS_OFFSET_Y,
-                           -(TOP_DEPTH - PANEL_T)])
-                    rotate([0, 0, atan2(sy, sx) - 45])
-                        case_screw_boss_top();
+            // Bosses + overlength fins, clipped to the outer prismoid so the
+            // fins follow the wall taper and corner rounding precisely.
+            intersection() {
+                case_top_outer();
+                for (sx = [-1, 1], sy = [-1, 1])
+                    translate([sx*CASE_BOSS_OFFSET_X,
+                               sy*CASE_BOSS_OFFSET_Y,
+                               -(TOP_DEPTH - PANEL_T)])
+                        rotate([0, 0, atan2(sy, sx) - 45])
+                            case_screw_boss_top();
+            }
         }
 
         // ----- Panel cutouts -----
