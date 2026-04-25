@@ -11,12 +11,21 @@ include <parameters.scad>
 use <shell_top.scad>
 use <../parts/layout_front.scad>
 
-module assembly_check() {
-    // Top shell (translucent so components remain visible through the panel)
-    %color(COLOR_PRINTED) shell_top();
+// SHELL_XRAY: when true, render the shell as a translucent background (lets
+// you see PCBs and below-panel component bodies for cutout verification).
+// When false, render solid — only above-panel features (lever balls,
+// encoder shafts, illuminated caps, etc.) remain visible.
+SHELL_XRAY = false;
 
-    // All vitamins and sub-PCBs at their layout positions
-    transmitter_layout_front();
+module assembly_check() {
+    if (SHELL_XRAY)
+        %color(COLOR_PRINTED) shell_top();
+    else
+        color(COLOR_PRINTED) shell_top();
+
+    // All vitamins and sub-PCBs at their layout positions; suppress the
+    // mock translucent panel because the real shell already provides it.
+    transmitter_layout_front(show_mock_panel=false);
 }
 
 // =============================================================================

@@ -18,24 +18,45 @@ use <../parts/button_illuminated.scad>
 use <../parts/button_tact.scad>
 use <../parts/display.scad>
 
+// Rectangular 2D path centered at origin — input for rounded_prism.
+function rect_path(w, d) = [
+    [-w/2, -d/2],
+    [ w/2, -d/2],
+    [ w/2,  d/2],
+    [-w/2,  d/2]
+];
+
 // =============================================================================
 module shell_top() {
-    difference() {
-        // Outer shell — front face at z=PANEL_T, side walls go back to
-        // z=PANEL_T-TOP_DEPTH. All edges rounded except the back-mating
-        // ones (those stay flat for clean joining with the bottom shell).
-        translate([0, 0, PANEL_T])
-            cuboid([CASE_W, CASE_H, TOP_DEPTH],
-                   rounding=CORNER_R, edges="ALL", except=BOT,
-                   anchor=TOP);
+    // NOTE: We tried rounded_prism for the outer (would give Top-Edge-Rundung
+    // combined with the taper) but it interacts badly with the inner-cavity
+    // boolean — the panel slab gets eaten. For now we use prismoid (taper +
+    // rounded vertical corners + sharp top-face edges) which renders cleanly.
+    // The rounded top edge can come back via offset_sweep / minkowski later.
 
-        // Inner cavity — same shape minus walls + panel, leaves the front
-        // panel slab solid and the side walls intact.
-        cuboid([CASE_W - 2*WALL_T, CASE_H - 2*WALL_T,
-                TOP_DEPTH - PANEL_T + 0.1],
-               rounding=max(CORNER_R - WALL_T, 0.5),
-               edges="ALL", except=BOT,
-               anchor=TOP);
+    difference() {
+        // Outer shell — tapered prismoid, front face wider than back face.
+        translate([0, 0, PANEL_T])
+            prismoid(
+                size1=[CASE_W - 2*TAPER_X, CASE_H - 2*TAPER_Y],
+                size2=[CASE_W,              CASE_H            ],
+                h=TOP_DEPTH,
+                rounding=CORNER_R,
+                anchor=TOP
+            );
+
+        // Inner cavity — same taper, smaller by wall thickness. Anchor TOP
+        // so the inner top face sits right at the panel inner face (z=0.1),
+        // leaving a PANEL_T panel slab.
+        translate([0, 0, 0.1])
+            prismoid(
+                size1=[CASE_W - 2*TAPER_X - 2*WALL_T,
+                       CASE_H - 2*TAPER_Y - 2*WALL_T],
+                size2=[CASE_W - 2*WALL_T, CASE_H - 2*WALL_T],
+                h=TOP_DEPTH - PANEL_T + 0.2,
+                rounding=max(CORNER_R - WALL_T, 0.5),
+                anchor=TOP
+            );
 
         // ----- Panel cutouts -----
 

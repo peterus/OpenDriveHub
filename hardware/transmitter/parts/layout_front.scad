@@ -96,11 +96,13 @@ MAIN_PCB_Z       = -19.15;  // main PCB center, header top meets display pin tip
 // =============================================================================
 // Layout module
 // =============================================================================
-module transmitter_layout_front() {
-    // Mock panel — translucent so we can see vitamins penetrating it
-    %color(COLOR_GHOST)
-        down(PANEL_T)
-            cuboid([PANEL_W, PANEL_H, PANEL_T], anchor=BOTTOM);
+module transmitter_layout_front(show_mock_panel=true) {
+    // Mock panel — translucent so we can see vitamins penetrating it.
+    // Suppress when the real case shell is also being rendered.
+    if (show_mock_panel)
+        %color(COLOR_GHOST)
+            down(PANEL_T)
+                cuboid([PANEL_W, PANEL_H, PANEL_T], anchor=BOTTOM);
 
     // Display
     translate([DISPLAY_POS.x, DISPLAY_POS.y, 0])

@@ -25,8 +25,14 @@ TOP_DEPTH       = 35;    // top shell rear opening to front panel face
 BOTTOM_DEPTH    = 35;    // bottom shell rear face to front opening
 
 // ----- Outer cosmetics -----
-CORNER_R        = 10;    // outer rounding (vertical corners + top edges)
+CORNER_R        = 14;    // outer rounding (vertical corners)
+TOP_EDGE_R      = 5;     // top-face edge rounding (where front face meets side walls)
 EDGE_FILLET     = 1.5;   // small fillet on inner edges to reduce stress
+
+// ----- Taper: front face bigger than back face for a "shaped" profile -----
+// size1 (back) = front dimension - 2*TAPER_*
+TAPER_X         = 6;     // case narrows by 12mm total in X from front to back
+TAPER_Y         = 4;     // case narrows by 8mm total in Y from front to back
 
 // ----- Outer dimensions (without grips) -----
 CASE_W          = PANEL_W + 2*WALL_T;
