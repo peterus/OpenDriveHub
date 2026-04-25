@@ -26,6 +26,20 @@ function rect_path(w, d) = [
     [-w/2,  d/2]
 ];
 
+// Top↔bottom mounting boss with M3 heat-set insert at its base. Stands on
+// the mating face and extends up into the top shell. The insert pocket
+// opens DOWNWARD so the screw enters from the bottom shell side.
+module case_screw_boss_top() {
+    difference() {
+        cyl(d=BOSS_OD, l=CASE_BOSS_HEIGHT_TOP, anchor=BOTTOM);
+        // Insert pocket opens at the bottom face (mating side).
+        translate([0, 0, -0.1])
+            cyl(d=INSERT_M3_POCKET_D,
+                l=INSERT_M3_POCKET_H + 0.1,
+                anchor=BOTTOM);
+    }
+}
+
 // =============================================================================
 module shell_top() {
     // Outer = tapered prismoid (rounded vertical corners) with a roundover
@@ -37,34 +51,48 @@ module shell_top() {
     // than being subtracted. Always use F6 to inspect the real result.
 
     difference() {
-        // Outer: prismoid where the BIG end is at the bottom (mating rim)
-        // and the SMALL end is at the top (front panel). The case bulges
-        // out at the middle (mating) and tapers inward toward the panel
-        // face — gives the "barrel" silhouette.
-        diff()
-        translate([0, 0, PANEL_T])
-            prismoid(
-                size1=[CASE_W,              CASE_H            ],   // mating rim, BIG
-                size2=[CASE_W - 2*TAPER_X, CASE_H - 2*TAPER_Y],   // front panel, SMALL
-                h=TOP_DEPTH,
-                rounding=CORNER_R,
-                anchor=TOP
-            )
-            {
-                edge_profile([TOP])
-                    mask2d_roundover(r=TOP_EDGE_R);
-            };
+        union() {
+            // Hollow outer shell — the cavity must be cut BEFORE the bosses
+            // are unioned in, otherwise it would eat them.
+            difference() {
+                // Outer: prismoid where the BIG end is at the bottom (mating
+                // rim) and the SMALL end is at the top (front panel). The
+                // case bulges out at the middle (mating) and tapers inward
+                // toward the panel face — gives the "barrel" silhouette.
+                diff()
+                translate([0, 0, PANEL_T])
+                    prismoid(
+                        size1=[CASE_W,              CASE_H            ],   // mating rim, BIG
+                        size2=[CASE_W - 2*TAPER_X, CASE_H - 2*TAPER_Y],   // front panel, SMALL
+                        h=TOP_DEPTH,
+                        rounding=CORNER_R,
+                        anchor=TOP
+                    )
+                    {
+                        edge_profile([TOP])
+                            mask2d_roundover(r=TOP_EDGE_R);
+                    };
 
-        // Inner cavity — same taper, smaller by wall thickness.
-        translate([0, 0, 0.1])
-            prismoid(
-                size1=[CASE_W - 2*WALL_T, CASE_H - 2*WALL_T],
-                size2=[CASE_W - 2*TAPER_X - 2*WALL_T,
-                       CASE_H - 2*TAPER_Y - 2*WALL_T],
-                h=TOP_DEPTH - PANEL_T + 0.2,
-                rounding=max(CORNER_R - WALL_T, 0.5),
-                anchor=TOP
-            );
+                // Inner cavity — same taper, smaller by wall thickness.
+                translate([0, 0, 0.1])
+                    prismoid(
+                        size1=[CASE_W - 2*WALL_T, CASE_H - 2*WALL_T],
+                        size2=[CASE_W - 2*TAPER_X - 2*WALL_T,
+                               CASE_H - 2*TAPER_Y - 2*WALL_T],
+                        h=TOP_DEPTH - PANEL_T + 0.2,
+                        rounding=max(CORNER_R - WALL_T, 0.5),
+                        anchor=TOP
+                    );
+            }
+
+            // 4 corner bosses standing on the mating face. They merge into
+            // the side wall near the panel face for stability.
+            for (sx = [-1, 1], sy = [-1, 1])
+                translate([sx*CASE_BOSS_OFFSET_X,
+                           sy*CASE_BOSS_OFFSET_Y,
+                           -(TOP_DEPTH - PANEL_T)])
+                    case_screw_boss_top();
+        }
 
         // ----- Panel cutouts -----
 

@@ -90,6 +90,19 @@ module batt_slot_walls() {
     }
 }
 
+// Top↔bottom mounting boss in the bottom shell. Sits on the back-panel
+// interior and reaches up to the mating face. Hollow tube — clearance for
+// the M3 screw all the way through to the back panel exterior.
+module case_screw_boss_bottom() {
+    difference() {
+        cyl(d=BOSS_OD, l=CASE_BOSS_HEIGHT_BOT, anchor=BOTTOM);
+        translate([0, 0, -0.1])
+            cyl(d=COVER_SCREW_CLEAR,
+                l=CASE_BOSS_HEIGHT_BOT + 0.2,
+                anchor=BOTTOM);
+    }
+}
+
 // =============================================================================
 module bottom_shell() {
     difference() {
@@ -132,6 +145,14 @@ module bottom_shell() {
             // Slot walls between the bosses with a wire-exit notch.
             translate([BATT_POS_X, BATT_POS_Y, -BOTTOM_DEPTH + PANEL_T])
                 batt_slot_walls();
+
+            // 4 case-corner bosses with M3 screw clearance for fastening
+            // the bottom shell to the top shell.
+            for (sx = [-1, 1], sy = [-1, 1])
+                translate([sx*CASE_BOSS_OFFSET_X,
+                           sy*CASE_BOSS_OFFSET_Y,
+                           -BOTTOM_DEPTH + PANEL_T])
+                    case_screw_boss_bottom();
         }
 
         // ----- Subtractions on the back panel -----
@@ -155,6 +176,14 @@ module bottom_shell() {
         for (sx = [-1, 1], sy = [-1, 1])
             translate([BATT_POS_X + sx*BATT_BOSS_OFFSET_X,
                        BATT_POS_Y + sy*BATT_BOSS_OFFSET_Y,
+                       -BOTTOM_DEPTH - 0.1])
+                cyl(d=COVER_SCREW_CLEAR, l=PANEL_T + 0.2, anchor=BOTTOM);
+
+        // 4 case-corner screw clearance holes through the back panel
+        // (continuation of the case_screw_boss_bottom through-tubes).
+        for (sx = [-1, 1], sy = [-1, 1])
+            translate([sx*CASE_BOSS_OFFSET_X,
+                       sy*CASE_BOSS_OFFSET_Y,
                        -BOTTOM_DEPTH - 0.1])
                 cyl(d=COVER_SCREW_CLEAR, l=PANEL_T + 0.2, anchor=BOTTOM);
     }

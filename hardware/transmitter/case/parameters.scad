@@ -49,6 +49,23 @@ BOSS_OD         = 7;
 BOSS_INSERT_D   = INSERT_M3_POCKET_D;
 BOSS_INSERT_H   = INSERT_M3_POCKET_H;
 
+// 4 case-corner bosses connect top and bottom shells. Insert lives in the
+// top-shell boss; screw enters from the back panel exterior, runs through
+// a hollow bottom-shell boss, crosses the mating face, threads into the
+// insert. Position chosen so the boss merges into the side wall at the
+// panel face (smallest section due to taper) for strength while staying
+// fully inside the cavity at the mating face.
+//
+// The top boss is kept short to clear the toggle-switch bodies that hang
+// under the front panel into the upper case. The bottom boss runs the
+// full bottom-shell depth so the screw is supported all the way.
+//
+// Screw: M3 x 40 (5mm thread engagement into the insert).
+CASE_BOSS_OFFSET_X   = 129;
+CASE_BOSS_OFFSET_Y   = 56;
+CASE_BOSS_HEIGHT_TOP = 13;                        // mating face up
+CASE_BOSS_HEIGHT_BOT = BOTTOM_DEPTH - PANEL_T;    // back panel up to mating
+
 // ----- Battery compartment (LiPo cover access on the bottom-shell back) -----
 // Battery is BATT_BODY=[80,35,15]; cover/opening sized with clearance.
 // Position is in case-world XY; battery shifted toward the bottom of the
