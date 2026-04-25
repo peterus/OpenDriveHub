@@ -20,3 +20,8 @@ __pycache__
 
 # OpenSCAD render output (regenerable via openscad-mcp render_perspectives)
 renders/
+
+# Generated 3D-print artifacts (exported from .scad files; not tracked
+# unless intentionally checked in case-by-case)
+*.stl
+*.3mf
