@@ -136,10 +136,15 @@ module bottom_shell() {
 
         // ----- Subtractions on the back panel -----
 
-        // Cover recess (exterior side of back panel; cover sits flush).
+        // Cover recess (exterior side of back panel). Recess is enlarged by
+        // BATT_COVER_FIT (XY) and BATT_COVER_Z_GAP (Z) so the cover slides in
+        // with print tolerance and a small visible gap for inspection.
         translate([BATT_POS_X, BATT_POS_Y, -BOTTOM_DEPTH - 0.1])
-            cuboid([BATT_COVER_W, BATT_COVER_H, BATT_COVER_RECESS + 0.1],
-                   rounding=BATT_COVER_R, edges="Z", anchor=BOTTOM);
+            cuboid([BATT_COVER_W + 2*BATT_COVER_FIT,
+                    BATT_COVER_H + 2*BATT_COVER_FIT,
+                    BATT_COVER_RECESS + BATT_COVER_Z_GAP + 0.1],
+                   rounding=BATT_COVER_R + BATT_COVER_FIT, edges="Z",
+                   anchor=BOTTOM);
 
         // Through-hole for battery insertion.
         translate([BATT_POS_X, BATT_POS_Y, -BOTTOM_DEPTH - 0.1])

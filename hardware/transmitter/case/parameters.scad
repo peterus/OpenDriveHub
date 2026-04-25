@@ -59,10 +59,14 @@ BATT_OPENING_W    = 82;     // through-hole for battery insertion (battery + 1mm
 BATT_OPENING_H    = 37;
 BATT_COVER_W      = 110;    // cover plate footprint (must be wider than the boss row)
 BATT_COVER_H      = 64;
-BATT_COVER_T      = 2;      // cover plate thickness — equals RECESS for flush fit
-BATT_COVER_RECESS = 2;      // depth of recess in back-panel so cover sits flush
-                            // (back-panel left at PANEL_T-RECESS=1mm in cover area)
+BATT_COVER_T      = 2;      // cover plate thickness
+BATT_COVER_RECESS = 2;      // nominal recess depth — actual cut = RECESS + Z_GAP,
+                            // so the cover top sits BATT_COVER_Z_GAP below flush
 BATT_COVER_R      = 2;      // corner rounding on the cover plate
+// Print clearance so the cover doesn't bind in the recess and the gap is
+// visible in OpenSCAD assembly checks.
+BATT_COVER_FIT    = FIT_FREE; // XY clearance per side (slip fit)
+BATT_COVER_Z_GAP  = 0.3;      // Z gap — cover top this far below outer panel face
 
 // Corner bosses inside the bottom-shell — each holds two M3 heat-set inserts
 // (one near the back-panel for the exterior cover, one at the top for the

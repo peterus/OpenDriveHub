@@ -35,10 +35,13 @@ module assembly_check() {
             color(COLOR_PRINTED) bottom_shell();
     }
 
-    // Battery cover (exterior, flush in the recess on the back panel).
+    // Battery cover seated against the recess shoulder. Its outer face sits
+    // BATT_COVER_Z_GAP below the panel exterior — the visible step is the
+    // print-tolerance gap, not a geometry mismatch.
     translate([BATT_POS_X, BATT_POS_Y,
                PANEL_T - TOP_DEPTH - BOTTOM_DEPTH
-                   + BATT_COVER_RECESS - BATT_COVER_T/2])
+                   + BATT_COVER_RECESS + BATT_COVER_Z_GAP
+                   - BATT_COVER_T/2])
         battery_cover();
 
     // Battery interior lid — sits at the top of the corner bosses.
