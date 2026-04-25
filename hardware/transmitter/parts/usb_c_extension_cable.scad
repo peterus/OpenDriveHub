@@ -56,12 +56,6 @@ module usb_c_extension_panel(anchor=CENTER, spin=0, orient=UP) {
                     cuboid([USBC_OPENING_W, USBC_OPENING_DEPTH + 0.1, USBC_OPENING_H],
                            rounding=0.5, edges="Y");
             }
-            // 2 visible screw heads on the flange face
-            for (sx = [-1, 1])
-                color("#404040")
-                    translate([sx*USBC_SCREW_PITCH/2, -USBC_HOUSING_DEPTH/2 - 0.4, 0])
-                        rotate([90, 0, 0])
-                            cyl(d=4, l=0.8, anchor=BOTTOM);
             // Cable stub exiting the back (+Y)
             color(COLOR_PLASTIC)
                 translate([0, USBC_HOUSING_DEPTH/2, 0])
