@@ -25,8 +25,13 @@ TOP_DEPTH       = 35;    // top shell rear opening to front panel face
 BOTTOM_DEPTH    = 35;    // bottom shell rear face to front opening
 
 // ----- Outer cosmetics -----
-CORNER_R        = 14;    // outer rounding (vertical corners)
-TOP_EDGE_R      = 5;     // top-face edge rounding (where front face meets side walls)
+// CORNER_R and TOP_EDGE_R should match (or be close) so the vertical
+// rounding and the top-face rounding blend smoothly at the corner. Big
+// difference between them creates a visible "saddle" seam at the
+// front-top corners.
+CORNER_R        = 14;    // vertical corner rounding
+TOP_EDGE_R      = 2.5;   // top-face edge rounding (must stay below WALL_T=3
+                         // or it eats through the panel slab at the corners)
 EDGE_FILLET     = 1.5;   // small fillet on inner edges to reduce stress
 
 // ----- Taper: front face bigger than back face for a "shaped" profile -----

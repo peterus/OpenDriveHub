@@ -35,7 +35,9 @@ module shell_top() {
     // Inner cavity is a plain prismoid that matches the taper.
 
     difference() {
-        // Outer shell with top-face roundover applied via tagged diff.
+        // Outer shell with top-face roundover (edge_profile) and a spherical
+        // blend at the 4 top-vertical corners (corner_profile) so the small
+        // top-edge round merges smoothly into the larger vertical-corner round.
         diff()
         translate([0, 0, PANEL_T])
             prismoid(
