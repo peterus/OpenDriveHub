@@ -41,49 +41,78 @@ BOT_FRONT_H = CASE_H;
 BOT_BACK_W = BOT_FRONT_W - 2*BOT_TAPER_X;
 BOT_BACK_H = BOT_FRONT_H - 2*BOT_TAPER_Y;
 
+// Corner boss with two M3 insert pockets (bottom for cover screw,
+// top for battery-lid screw). Drawn relative to its bottom face.
+module batt_corner_boss() {
+    difference() {
+        cyl(d=BATT_BOSS_OD, l=BATT_BOSS_HEIGHT, anchor=BOTTOM);
+        // Bottom insert pocket (opens DOWN for cover screw from outside)
+        translate([0, 0, -0.1])
+            cyl(d=INSERT_M3_POCKET_D, l=INSERT_M3_POCKET_H + 0.1, anchor=BOTTOM);
+        // Top insert pocket (opens UP for lid screw from case interior)
+        translate([0, 0, BATT_BOSS_HEIGHT + 0.1])
+            cyl(d=INSERT_M3_POCKET_D, l=INSERT_M3_POCKET_H + 0.1, anchor=TOP);
+    }
+}
+
 // =============================================================================
 module bottom_shell() {
     difference() {
-        // Outer: tapered prismoid; back panel (smaller) at z=-BOTTOM_DEPTH,
-        // mating face (bigger) at z=0. The four edges where the back panel
-        // meets the side walls get a roundover via diff() / edge_profile.
-        diff()
-        translate([0, 0, -BOTTOM_DEPTH])
-            prismoid(
-                size1=[BOT_BACK_W,  BOT_BACK_H ],
-                size2=[BOT_FRONT_W, BOT_FRONT_H],
-                h=BOTTOM_DEPTH,
-                rounding=CORNER_R,
-                anchor=BOTTOM
-            )
-            {
-                edge_profile([BOT])
-                    mask2d_roundover(r=TOP_EDGE_R);
-            };
+        union() {
+            // Hollow shell: outer tapered prismoid minus inner cavity.
+            difference() {
+                // Outer with rounded back panel
+                diff()
+                translate([0, 0, -BOTTOM_DEPTH])
+                    prismoid(
+                        size1=[BOT_BACK_W,  BOT_BACK_H ],
+                        size2=[BOT_FRONT_W, BOT_FRONT_H],
+                        h=BOTTOM_DEPTH,
+                        rounding=CORNER_R,
+                        anchor=BOTTOM
+                    )
+                    {
+                        edge_profile([BOT])
+                            mask2d_roundover(r=TOP_EDGE_R);
+                    };
 
-        // Inner cavity — open at the mating face (z=0), closed at the back
-        // panel (z=-BOTTOM_DEPTH+PANEL_T). Same taper as outer, smaller by
-        // wall thickness on every side.
-        translate([0, 0, -BOTTOM_DEPTH + PANEL_T])
-            prismoid(
-                size1=[BOT_BACK_W  - 2*WALL_T, BOT_BACK_H  - 2*WALL_T],
-                size2=[BOT_FRONT_W - 2*WALL_T, BOT_FRONT_H - 2*WALL_T],
-                h=BOTTOM_DEPTH - PANEL_T + 0.2,
-                rounding=max(CORNER_R - WALL_T, 0.5),
-                anchor=BOTTOM
-            );
+                // Inner cavity
+                translate([0, 0, -BOTTOM_DEPTH + PANEL_T])
+                    prismoid(
+                        size1=[BOT_BACK_W  - 2*WALL_T, BOT_BACK_H  - 2*WALL_T],
+                        size2=[BOT_FRONT_W - 2*WALL_T, BOT_FRONT_H - 2*WALL_T],
+                        h=BOTTOM_DEPTH - PANEL_T + 0.2,
+                        rounding=max(CORNER_R - WALL_T, 0.5),
+                        anchor=BOTTOM
+                    );
+            }
 
-        // ----- Battery cover: recess on the exterior + through-hole -----
+            // 4 corner bosses on the back-panel-interior face.
+            for (sx = [-1, 1], sy = [-1, 1])
+                translate([BATT_POS_X + sx*BATT_BOSS_OFFSET_X,
+                           BATT_POS_Y + sy*BATT_BOSS_OFFSET_Y,
+                           -BOTTOM_DEPTH + PANEL_T])
+                    batt_corner_boss();
+        }
 
-        // Recess so the cover sits flush with the back-panel surface.
+        // ----- Subtractions on the back panel -----
+
+        // Cover recess (exterior side of back panel; cover sits flush).
         translate([BATT_POS_X, BATT_POS_Y, -BOTTOM_DEPTH - 0.1])
             cuboid([BATT_COVER_W, BATT_COVER_H, BATT_COVER_RECESS + 0.1],
                    rounding=BATT_COVER_R, edges="Z", anchor=BOTTOM);
 
-        // Through-hole for battery access (penetrates the remaining back-panel).
+        // Through-hole for battery insertion.
         translate([BATT_POS_X, BATT_POS_Y, -BOTTOM_DEPTH - 0.1])
             cuboid([BATT_OPENING_W, BATT_OPENING_H, PANEL_T + 0.2],
                    rounding=BATT_COVER_R, edges="Z", anchor=BOTTOM);
+
+        // 4 cover-screw clearance holes through the back panel.
+        for (sx = [-1, 1], sy = [-1, 1])
+            translate([BATT_POS_X + sx*BATT_BOSS_OFFSET_X,
+                       BATT_POS_Y + sy*BATT_BOSS_OFFSET_Y,
+                       -BOTTOM_DEPTH - 0.1])
+                cyl(d=COVER_SCREW_CLEAR, l=PANEL_T + 0.2, anchor=BOTTOM);
     }
 }
 

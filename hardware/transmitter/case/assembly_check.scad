@@ -11,6 +11,7 @@ include <parameters.scad>
 use <shell_top.scad>
 use <bottom_shell.scad>
 use <battery_cover.scad>
+use <battery_lid.scad>
 use <../parts/layout_front.scad>
 
 // SHELL_XRAY: when true, render the shell as a translucent background (lets
@@ -34,14 +35,18 @@ module assembly_check() {
             color(COLOR_PRINTED) bottom_shell();
     }
 
-    // Battery cover sitting in its recess on the bottom-shell back panel.
-    // World Z of the back-panel exterior:
-    //   PANEL_T - TOP_DEPTH (= top-shell back rim) + (-BOTTOM_DEPTH)
-    //   = -(TOP_DEPTH + BOTTOM_DEPTH - PANEL_T)
+    // Battery cover (exterior, flush in the recess on the back panel).
     translate([BATT_POS_X, BATT_POS_Y,
                PANEL_T - TOP_DEPTH - BOTTOM_DEPTH
                    + BATT_COVER_RECESS - BATT_COVER_T/2])
         battery_cover();
+
+    // Battery interior lid — sits at the top of the corner bosses.
+    // Boss top in world Z = PANEL_T - TOP_DEPTH - BOTTOM_DEPTH + PANEL_T + BATT_BOSS_HEIGHT
+    translate([BATT_POS_X, BATT_POS_Y,
+               PANEL_T - TOP_DEPTH - BOTTOM_DEPTH + PANEL_T
+                   + BATT_BOSS_HEIGHT + BATT_LID_T/2])
+        battery_lid();
 
     // All vitamins and sub-PCBs at their layout positions; suppress the
     // mock translucent panel because the real shell already provides it.

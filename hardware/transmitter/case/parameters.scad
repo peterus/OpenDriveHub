@@ -51,17 +51,37 @@ BOSS_INSERT_H   = INSERT_M3_POCKET_H;
 
 // ----- Battery compartment (LiPo cover access on the bottom-shell back) -----
 // Battery is BATT_BODY=[80,35,15]; cover/opening sized with clearance.
-// Position is in case-world XY (back-panel face is at z=-TOP_DEPTH-BOTTOM_DEPTH+PANEL_T).
+// Position is in case-world XY; battery shifted toward the bottom of the
+// case for grip-balance (heavier mass closer to the user's grip).
 BATT_POS_X        = 0;
-BATT_POS_Y        = 0;
+BATT_POS_Y        = -25;
 BATT_OPENING_W    = 82;     // through-hole for battery insertion (battery + 1mm/side)
 BATT_OPENING_H    = 37;
-BATT_COVER_W      = 92;     // cover plate footprint (5mm overhang on every side)
-BATT_COVER_H      = 47;
+BATT_COVER_W      = 110;    // cover plate footprint (must be wider than the boss row)
+BATT_COVER_H      = 64;
 BATT_COVER_T      = 2;      // cover plate thickness — equals RECESS for flush fit
 BATT_COVER_RECESS = 2;      // depth of recess in back-panel so cover sits flush
                             // (back-panel left at PANEL_T-RECESS=1mm in cover area)
 BATT_COVER_R      = 2;      // corner rounding on the cover plate
+
+// Corner bosses inside the bottom-shell — each holds two M3 heat-set inserts
+// (one near the back-panel for the exterior cover, one at the top for the
+// interior battery lid). Boss XY positions clear the battery body with
+// ~5mm to each side. Cover screws inset 5mm from cover edge match these.
+BATT_BOSS_OD       = 7;     // 1.5mm wall around M3 insert pocket
+BATT_BOSS_OFFSET_X = 45;    // = BATT_BODY.x/2 + 5 (battery edge + 5mm)
+BATT_BOSS_OFFSET_Y = 22;    // = BATT_BODY.y/2 + 4.5
+BATT_BOSS_HEIGHT   = 16;    // boss reaches from back-panel-interior to lid level
+
+// Interior battery lid — sits on the boss tops, prevents the LiPo from
+// dropping into the case interior.
+BATT_LID_W        = BATT_COVER_W;
+BATT_LID_H        = BATT_COVER_H;
+BATT_LID_T        = 2;
+BATT_LID_R        = BATT_COVER_R;
+
+// M3 clearance hole for the screws (slightly oversized for FDM tolerance).
+COVER_SCREW_CLEAR = 3.5;
 
 // =============================================================================
 // Layout positions duplicated from parts/layout_front.scad.

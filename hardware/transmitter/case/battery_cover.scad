@@ -11,10 +11,16 @@ include <parameters.scad>
 
 module battery_cover() {
     color(COLOR_PRINTED)
-        cuboid(
-            [BATT_COVER_W, BATT_COVER_H, BATT_COVER_T],
-            rounding=BATT_COVER_R, edges="Z"
-        );
+        difference() {
+            cuboid(
+                [BATT_COVER_W, BATT_COVER_H, BATT_COVER_T],
+                rounding=BATT_COVER_R, edges="Z"
+            );
+            // 4 M3 clearance holes at the boss positions
+            for (sx = [-1, 1], sy = [-1, 1])
+                translate([sx*BATT_BOSS_OFFSET_X, sy*BATT_BOSS_OFFSET_Y, 0])
+                    cyl(d=COVER_SCREW_CLEAR, l=BATT_COVER_T + 0.2, anchor=CENTER);
+        }
 }
 
 // =============================================================================
