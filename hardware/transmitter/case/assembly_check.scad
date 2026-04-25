@@ -13,7 +13,7 @@ use <bottom_shell.scad>
 use <battery_cover.scad>
 use <battery_lid.scad>
 use <../parts/battery.scad>
-use <../parts/usb_c_breakout.scad>
+use <../parts/usb_c_extension_cable.scad>
 use <../parts/layout_front.scad>
 
 // SHELL_XRAY: when true, render the shell as a translucent background (lets
@@ -65,14 +65,17 @@ module assembly_full() {
                PANEL_T - TOP_DEPTH - BOTTOM_DEPTH + PANEL_T])
         lipo_2s_2000mah(anchor=BOTTOM, show_wires=false);
 
-    // USB-C breakout PCB — sits on its standoffs in the bottom shell with
-    // the receptacle aligned with the -Y wall cutout. Long PCB axis runs
-    // along case Y (rotated -90° from the breakout's local +X = cable axis).
-    translate([USBC_POS_X, USBC_PCB_CENTER_Y,
-               PANEL_T - TOP_DEPTH - BOTTOM_DEPTH + PANEL_T
-                   + USBC_STANDOFF_H + 1.6/2])
-        rotate([0, 0, -90])
-            usb_c_breakout(anchor=BOTTOM);
+    // USB-C extension-cable female panel mount — flange sits flush against
+    // the OUTER face of the -Y wall, screws go from outside through the
+    // wall into M2 inserts in the inner-wall bosses.
+    // Outer-wall Y at z=USBC_POS_Z (in case world); housing depth is 5mm.
+    let(taper = (USBC_POS_Z + BOTTOM_DEPTH - PANEL_T) / (BOTTOM_DEPTH - PANEL_T),
+        outer_y = -((CASE_H - 2*TAPER_Y + 2*TAPER_Y * taper) / 2),
+        housing_depth = 5)
+    translate([USBC_POS_X,
+               outer_y - housing_depth/2,
+               USBC_POS_Z + (PANEL_T - TOP_DEPTH)])
+        usb_c_extension_panel(anchor=CENTER);
 
     // All vitamins and sub-PCBs at their layout positions; suppress the
     // mock translucent panel because the real shell already provides it.

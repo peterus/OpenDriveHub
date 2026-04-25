@@ -90,19 +90,29 @@ module batt_slot_walls() {
     }
 }
 
-// USB-C breakout mounting standoff: short cylinder with M2 insert pocket
-// at the top. Two of these stand at the breakout's mounting-hole positions
-// on the back-panel interior; the M2 screw pulls the breakout PCB down
-// against the standoff top.
-module usbc_standoff() {
+// USB-C extension-cable mounting boss: short cylinder on the inner -Y
+// wall surface, holding an M2 heat-set insert. The screw enters from
+// outside, passes through the wall clearance hole, and threads into the
+// insert. Two of these flank the USB-C cable cutout at 17mm pitch.
+//
+// Module is anchored at the boss's wall-facing face (BOTTOM = -Z local).
+// The insert pocket opens at this face so the insert is pressed in from
+// the wall side and the screw threads into it from outside.
+module usbc_boss() {
     difference() {
-        cyl(d=USBC_STANDOFF_OD, l=USBC_STANDOFF_H, anchor=BOTTOM);
-        translate([0, 0, USBC_STANDOFF_H + 0.1])
+        cyl(d=USBC_BOSS_OD, l=USBC_BOSS_H, anchor=BOTTOM);
+        translate([0, 0, -0.1])
             cyl(d=INSERT_M2_POCKET_D,
                 l=INSERT_M2_POCKET_H + 0.1,
-                anchor=TOP);
+                anchor=BOTTOM);
     }
 }
+
+// Inner -Y wall Y position at z=USBC_POS_Z (bottom-shell local).
+// Linear interpolation between back-panel (-22) and mating face (0).
+USBC_INNER_Y = -((BOT_BACK_H + (BOT_FRONT_H - BOT_BACK_H) *
+                  ((USBC_POS_Z + BOTTOM_DEPTH - PANEL_T) /
+                   (BOTTOM_DEPTH - PANEL_T))) / 2 - WALL_T);
 
 // Top↔bottom mounting boss in the bottom shell. Sits on the back-panel
 // interior and reaches up to the mating face. Hollow tube — clearance for
@@ -193,12 +203,17 @@ module bottom_shell() {
                             case_screw_boss_bottom();
             }
 
-            // 2 USB-C breakout mounting standoffs on the back panel.
-            for (sy = [-1, 1])
-                translate([USBC_POS_X,
-                           USBC_PCB_CENTER_Y + sy*USBC_HOLE_PITCH_CASE/2,
-                           -BOTTOM_DEPTH + PANEL_T])
-                    usbc_standoff();
+            // 2 USB-C extension-cable mounting bosses on the inner -Y
+            // wall, flanking the USB-C cable cutout. The bosses extend
+            // inward (+Y) from the inner wall surface; the M2 insert
+            // pocket opens at the wall side so the screw can thread in
+            // from outside through the wall.
+            for (sx = [-1, 1])
+                translate([USBC_POS_X + sx*USBC_SCREW_PITCH/2,
+                           USBC_INNER_Y,
+                           USBC_POS_Z])
+                    rotate([-90, 0, 0])
+                        usbc_boss();
         }
 
         // ----- Subtractions on the back panel -----
@@ -233,18 +248,17 @@ module bottom_shell() {
                        -BOTTOM_DEPTH - 0.1])
                 cyl(d=COVER_SCREW_CLEAR, l=PANEL_T + 0.2, anchor=BOTTOM);
 
-        // USB-C cable cutout in the -Y side wall. Cuboid extends well past
-        // both inner and outer wall surfaces so it cleanly cuts through
-        // even with the wall taper.
-        // Cable axis Z = back-panel-interior + USBC_STANDOFF_H + PCB_T + USBC_CONN_H/2
-        //              ≈ -BOTTOM_DEPTH + PANEL_T + 7 + 0.8 + 1.65 = -11.55 (bottom local)
-        translate([USBC_POS_X,
-                   -BOT_FRONT_H/2 - 1,                    // outside the wall
-                   -BOTTOM_DEPTH + PANEL_T + USBC_STANDOFF_H + 1.6 + 1.65])
-            cuboid([USBC_OPENING_W,
-                    20,                                   // through whole wall + slack
-                    USBC_OPENING_H],
-                   anchor=FRONT);
+        // USB-C cable cutout + 2 screw clearance holes through the -Y wall.
+        // All three cuts are oversized in Y (wall-thickness direction) so
+        // the wall taper doesn't leave a sliver of material.
+        translate([USBC_POS_X, -BOT_FRONT_H/2 - 1, USBC_POS_Z])
+            cuboid([USBC_OPENING_W, 20, USBC_OPENING_H], anchor=FRONT);
+        for (sx = [-1, 1])
+            translate([USBC_POS_X + sx*USBC_SCREW_PITCH/2,
+                       -BOT_FRONT_H/2 - 1,
+                       USBC_POS_Z])
+                rotate([-90, 0, 0])
+                    cyl(d=USBC_SCREW_CLEAR, l=20, anchor=BOTTOM);
     }
 }
 
