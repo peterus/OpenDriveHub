@@ -28,7 +28,7 @@ BATT_MASS_G = 32;
 // -----------------------------------------------------------------------------
 // Main module: the LiPo cell as a visualization vitamin.
 // -----------------------------------------------------------------------------
-module lipo_2s_2000mah(anchor=CENTER, spin=0, orient=UP) {
+module lipo_2s_2000mah(anchor=CENTER, spin=0, orient=UP, show_wires=true) {
     size = BATT_BODY;
     anchors = [
         named_anchor("wire_exit", [size.x/2, 0, 0], RIGHT),
@@ -36,12 +36,12 @@ module lipo_2s_2000mah(anchor=CENTER, spin=0, orient=UP) {
     ];
 
     attachable(anchor, spin, orient, size=size, anchors=anchors) {
-        _lipo_2s_geometry();
+        _lipo_2s_geometry(show_wires=show_wires);
         children();
     }
 }
 
-module _lipo_2s_geometry() {
+module _lipo_2s_geometry(show_wires=true) {
     // Main pouch body — silver-metallic foil
     color("#b0b0a8")
         cuboid(BATT_BODY, rounding=BATT_CORNER_R, edges="Z")
@@ -49,6 +49,10 @@ module _lipo_2s_geometry() {
                 color("#a8a8a0")
                     cuboid([BATT_EDGE_SEAL, BATT_BODY.y*0.92, BATT_EDGE_SEAL*0.7]);
 
+    if (show_wires) _lipo_2s_wires();
+}
+
+module _lipo_2s_wires() {
     // Wire bundle originates just past the sealed edge
     wire_start_x = BATT_BODY.x/2 + BATT_EDGE_SEAL;
 

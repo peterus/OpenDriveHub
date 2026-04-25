@@ -12,6 +12,7 @@ use <top_shell.scad>
 use <bottom_shell.scad>
 use <battery_cover.scad>
 use <battery_lid.scad>
+use <../parts/battery.scad>
 use <../parts/layout_front.scad>
 
 // SHELL_XRAY: when true, render the shell as a translucent background (lets
@@ -20,7 +21,13 @@ use <../parts/layout_front.scad>
 // encoder shafts, illuminated caps, etc.) remain visible.
 SHELL_XRAY = false;
 
-module assembly_check() {
+// SECTION: cuts the assembly through the centre so the interior is
+// visible. "x" removes the +X half (look at the cut from +X), "y"
+// removes the +Y half (look at the cut from +Y), "none" leaves the
+// assembly intact. Set via -D SECTION='"x"' on the command line.
+SECTION = "none";
+
+module assembly_full() {
     // Top shell at world Z (panel-mating face at z=0, panel face at z=PANEL_T).
     if (SHELL_XRAY)
         %color(COLOR_PRINTED) top_shell();
@@ -51,9 +58,31 @@ module assembly_check() {
                    + BATT_BOSS_HEIGHT + BATT_LID_T/2])
         battery_lid();
 
+    // LiPo cell sitting on the back-panel-interior, centred in its slot.
+    // Wires hidden — they're flexible and routed wherever needed.
+    translate([BATT_POS_X, BATT_POS_Y,
+               PANEL_T - TOP_DEPTH - BOTTOM_DEPTH + PANEL_T])
+        lipo_2s_2000mah(anchor=BOTTOM, show_wires=false);
+
     // All vitamins and sub-PCBs at their layout positions; suppress the
     // mock translucent panel because the real shell already provides it.
     transmitter_layout_front(show_mock_panel=false);
+}
+
+module assembly_check() {
+    if (SECTION == "none") {
+        assembly_full();
+    } else {
+        // Big cuboid covers one half of the case; subtracting it slices the
+        // assembly through the centre so the interior is exposed.
+        difference() {
+            assembly_full();
+            if (SECTION == "x")
+                translate([0, 0, 0]) cuboid([400, 400, 400], anchor=LEFT);
+            else if (SECTION == "y")
+                translate([0, 0, 0]) cuboid([400, 400, 400], anchor=FRONT);
+        }
+    }
 }
 
 // =============================================================================

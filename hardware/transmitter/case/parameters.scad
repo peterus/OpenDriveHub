@@ -21,8 +21,13 @@ WALL_T          = 3;     // outer side-wall thickness
 PANEL_T         = 3;     // front-panel thickness (where components mount)
 
 // ----- Top vs bottom shell depth (sum = total case interior depth) -----
-TOP_DEPTH       = 35;    // top shell rear opening to front panel face
-BOTTOM_DEPTH    = 35;    // bottom shell rear face to front opening
+// TOP_DEPTH must clear the joystick body (28mm) + pin block (6mm) — pin
+// block is allowed to extend a few mm into the bottom shell cavity since
+// nothing else lives at that XY position.
+// BOTTOM_DEPTH must clear the battery + slot walls + lid (~18mm) plus a
+// little headroom.
+TOP_DEPTH       = 30;    // top shell rear opening to front panel face
+BOTTOM_DEPTH    = 25;    // bottom shell rear face to front opening
 
 // ----- Outer cosmetics -----
 // CORNER_R and TOP_EDGE_R should match (or be close) so the vertical
