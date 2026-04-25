@@ -73,6 +73,14 @@ BATT_BOSS_OFFSET_X = 45;    // = BATT_BODY.x/2 + 5 (battery edge + 5mm)
 BATT_BOSS_OFFSET_Y = 22;    // = BATT_BODY.y/2 + 4.5
 BATT_BOSS_HEIGHT   = 16;    // boss reaches from back-panel-interior to lid level
 
+// Battery-slot walls — 4 walls between the bosses keep the LiPo from
+// sliding around. The +Y wall has a notch where the power + balance
+// wires exit toward the main PCB.
+BATT_WALL_T        = 2;     // slot wall thickness
+BATT_WALL_INSET    = 1;     // gap between battery edge and wall inner face
+BATT_WIRE_NOTCH_W  = 22;    // notch width in +Y wall (X axis)
+BATT_WIRE_NOTCH_H  = 10;    // notch height (Z axis), measured from boss top down
+
 // Interior battery lid — sits on the boss tops, prevents the LiPo from
 // dropping into the case interior.
 BATT_LID_W        = BATT_COVER_W;

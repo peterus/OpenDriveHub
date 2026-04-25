@@ -23,3 +23,7 @@ INSERT_M3_POCKET_H = INSERT_M3_LEN + 0.5;
 
 // --- Assembly visualization ---
 EXPLODE        = 0;            // 0 = assembled; >0 separates parts along Z for preview
+
+// --- 2S LiPo pouch nominal dimensions (verify with calipers!) ---
+// Used by parts/battery.scad and case/bottom_shell.scad battery compartment.
+BATT_BODY      = [80, 35, 15]; // pouch body [x, y, z] in mm

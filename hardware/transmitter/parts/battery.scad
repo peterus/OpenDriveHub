@@ -13,8 +13,7 @@ include <BOSL2/std.scad>
 include <parameters.scad>
 include <utils.scad>
 
-// ----- 2S LiPo pouch nominal dimensions (verify!) -----
-BATT_BODY        = [80, 35, 15];   // pouch body [x, y, z] in mm
+// BATT_BODY now lives in parts/parameters.scad (shared with case/bottom_shell.scad).
 BATT_EDGE_SEAL   = 4;              // sealed edge depth at wire end
 BATT_CORNER_R    = 2;              // pouch corner rounding (Z-axis edges)
 BATT_WIRE_D      = 1.8;            // OD of 18AWG silicone wire w/ insulation

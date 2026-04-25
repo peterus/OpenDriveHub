@@ -55,6 +55,41 @@ module batt_corner_boss() {
     }
 }
 
+// 4 walls forming a battery slot between the corner bosses. The +Y wall
+// (toward the main PCB) has a notch for the LiPo power + balance wires.
+// Drawn relative to BATT_POS, sitting on the back-panel-interior.
+module batt_slot_walls() {
+    // Inner-face offsets: half the battery body + a small clearance.
+    inner_x = BATT_BODY.x/2 + BATT_WALL_INSET;   // 41
+    inner_y = BATT_BODY.y/2 + BATT_WALL_INSET;   // 18.5
+    // Wall span along their long dimension reaches between the bosses.
+    span_x = 2 * BATT_BOSS_OFFSET_X;             // 90
+    span_y = 2 * BATT_BOSS_OFFSET_Y;             // 44
+
+    difference() {
+        union() {
+            // Two X-walls (left and right of battery, run along Y).
+            for (sx = [-1, 1])
+                translate([sx*(inner_x + BATT_WALL_T/2), 0, 0])
+                    cuboid([BATT_WALL_T, span_y, BATT_BOSS_HEIGHT],
+                           anchor=BOTTOM);
+            // Two Y-walls (top and bottom of battery, run along X).
+            for (sy = [-1, 1])
+                translate([0, sy*(inner_y + BATT_WALL_T/2), 0])
+                    cuboid([span_x, BATT_WALL_T, BATT_BOSS_HEIGHT],
+                           anchor=BOTTOM);
+        }
+        // Wire-exit notch in the +Y wall (top of wall, leaves bottom intact
+        // so the LiPo body still sits captive).
+        translate([0, inner_y + BATT_WALL_T/2,
+                   BATT_BOSS_HEIGHT - BATT_WIRE_NOTCH_H])
+            cuboid([BATT_WIRE_NOTCH_W,
+                    BATT_WALL_T + 0.4,
+                    BATT_WIRE_NOTCH_H + 0.1],
+                   anchor=BOTTOM);
+    }
+}
+
 // =============================================================================
 module bottom_shell() {
     difference() {
@@ -93,6 +128,10 @@ module bottom_shell() {
                            BATT_POS_Y + sy*BATT_BOSS_OFFSET_Y,
                            -BOTTOM_DEPTH + PANEL_T])
                     batt_corner_boss();
+
+            // Slot walls between the bosses with a wire-exit notch.
+            translate([BATT_POS_X, BATT_POS_Y, -BOTTOM_DEPTH + PANEL_T])
+                batt_slot_walls();
         }
 
         // ----- Subtractions on the back panel -----
