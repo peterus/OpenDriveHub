@@ -11,7 +11,7 @@ include <parameters.scad>
 CORNER_TEST_SIZE = 55;   // edge length of the cube cutting out the corner
 
 module corner_shell() {
-    // Same outer + inner-cavity construction as shell_top, but no panel cutouts
+    // Same outer + inner-cavity construction as top_shell, but no panel cutouts
     // (cutouts are validated separately; this test piece is just the shape).
     difference() {
         diff()

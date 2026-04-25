@@ -1,6 +1,6 @@
 // Bottom shell — back half of the transmitter case.
 //
-// Pendant to shell_top.scad: same construction (tapered prismoid with
+// Pendant to top_shell.scad: same construction (tapered prismoid with
 // rounded vertical corners + roundover on the outer panel edges), but
 // inverted so it mates with the top shell's back rim.
 //
@@ -17,7 +17,7 @@
 include <BOSL2/std.scad>
 include <parameters.scad>
 
-// 2D rectangular path centred at origin (same helper as shell_top).
+// 2D rectangular path centred at origin (same helper as top_shell).
 function rect_path(w, d) = [
     [-w/2, -d/2],
     [ w/2, -d/2],

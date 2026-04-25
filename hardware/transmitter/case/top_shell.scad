@@ -85,7 +85,7 @@ module case_top_cavity() {
 }
 
 // =============================================================================
-module shell_top() {
+module top_shell() {
     difference() {
         union() {
             // Hollow outer shell.
@@ -154,5 +154,5 @@ module shell_top() {
 SHOW_STANDALONE = true;
 
 if (SHOW_STANDALONE) {
-    color(COLOR_PRINTED) shell_top();
+    color(COLOR_PRINTED) top_shell();
 }

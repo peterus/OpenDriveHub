@@ -8,7 +8,7 @@
 include <BOSL2/std.scad>
 include <parameters.scad>
 
-use <shell_top.scad>
+use <top_shell.scad>
 use <bottom_shell.scad>
 use <battery_cover.scad>
 use <battery_lid.scad>
@@ -23,9 +23,9 @@ SHELL_XRAY = false;
 module assembly_check() {
     // Top shell at world Z (panel-mating face at z=0, panel face at z=PANEL_T).
     if (SHELL_XRAY)
-        %color(COLOR_PRINTED) shell_top();
+        %color(COLOR_PRINTED) top_shell();
     else
-        color(COLOR_PRINTED) shell_top();
+        color(COLOR_PRINTED) top_shell();
 
     // Bottom shell, translated so its mating face joins the top-shell back rim.
     translate([0, 0, PANEL_T - TOP_DEPTH]) {
