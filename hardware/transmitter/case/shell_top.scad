@@ -28,14 +28,15 @@ function rect_path(w, d) = [
 
 // =============================================================================
 module shell_top() {
-    // NOTE: We tried rounded_prism for the outer (would give Top-Edge-Rundung
-    // combined with the taper) but it interacts badly with the inner-cavity
-    // boolean — the panel slab gets eaten. For now we use prismoid (taper +
-    // rounded vertical corners + sharp top-face edges) which renders cleanly.
-    // The rounded top edge can come back via offset_sweep / minkowski later.
+    // Strategy: the outer is a tapered prismoid (rounded vertical corners,
+    // sharp top-face edges by default). We then use BOSL2's `diff()` +
+    // `edge_profile()` to apply a roundover mask to the 4 top-face edges
+    // so the front face flows smoothly into the side walls.
+    // Inner cavity is a plain prismoid that matches the taper.
 
     difference() {
-        // Outer shell — tapered prismoid, front face wider than back face.
+        // Outer shell with top-face roundover applied via tagged diff.
+        diff()
         translate([0, 0, PANEL_T])
             prismoid(
                 size1=[CASE_W - 2*TAPER_X, CASE_H - 2*TAPER_Y],
@@ -43,11 +44,13 @@ module shell_top() {
                 h=TOP_DEPTH,
                 rounding=CORNER_R,
                 anchor=TOP
-            );
+            )
+            {
+                edge_profile([TOP])
+                    mask2d_roundover(r=TOP_EDGE_R);
+            };
 
-        // Inner cavity — same taper, smaller by wall thickness. Anchor TOP
-        // so the inner top face sits right at the panel inner face (z=0.1),
-        // leaving a PANEL_T panel slab.
+        // Inner cavity — same taper, smaller by wall thickness, no joint.
         translate([0, 0, 0.1])
             prismoid(
                 size1=[CASE_W - 2*TAPER_X - 2*WALL_T,
