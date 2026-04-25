@@ -130,19 +130,20 @@ BATT_LID_R        = BATT_COVER_R;
 COVER_SCREW_CLEAR = 3.5;
 
 // ----- USB-C extension cable mount (parts/usb_c_extension_cable.scad) -----
-// Female panel-mount housing sits AGAINST the outer face of the -Y wall.
-// 2 M2 screws come from outside through the wall and thread into M2
-// heat-set inserts in bosses on the inner side of the wall. The screws
-// trap the housing flange against the panel.
-USBC_POS_X         = 80;       // X centre on the -Y wall
-USBC_POS_Z         = -11;      // Z position in BOTTOM-SHELL LOCAL coords
-                               // (-11 ≈ centre of the 22mm-tall cavity)
-USBC_SCREW_PITCH   = 17;       // confirmed
-USBC_OPENING_W     = 9.4;      // USB-C cable-entry cutout (with FIT_FREE)
-USBC_OPENING_H     = 3.7;
-USBC_SCREW_CLEAR   = 2.4;      // M2 clearance hole through wall
-USBC_BOSS_OD       = 6;        // M2 insert + 1.5mm wall
-USBC_BOSS_H        = INSERT_M2_POCKET_H + 1;  // pocket + 1mm cap behind
+// Female panel-mount adapter sits INSIDE the case, flange flush against
+// the inner -Y wall surface. The adapter's flange has built-in M2 threads;
+// 2 M2 screws come from outside through wall clearance holes and thread
+// into the adapter, clamping it against the inner wall.
+//
+// The middle wall cutout has to be big enough for the USB-C plug AND its
+// over-moulded plastic boot — heavy-duty cables can have 12-14mm boots.
+USBC_POS_X          = 80;       // X centre on the -Y wall
+USBC_POS_Z          = -11;      // Z in BOTTOM-SHELL LOCAL coords (centre of cavity)
+USBC_SCREW_PITCH    = 17;       // confirmed
+USBC_SCREW_CLEAR    = 2.4;      // M2 clearance through wall
+USBC_PLUG_CLEAR_W   = 13;       // wall opening, X — fits plug + boot
+USBC_PLUG_CLEAR_H   = 8;        // wall opening, Z
+USBC_PLUG_CLEAR_R   = 1;        // corner rounding on the wall opening
 
 // =============================================================================
 // Layout positions duplicated from parts/layout_front.scad.

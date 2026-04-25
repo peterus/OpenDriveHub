@@ -65,15 +65,16 @@ module assembly_full() {
                PANEL_T - TOP_DEPTH - BOTTOM_DEPTH + PANEL_T])
         lipo_2s_2000mah(anchor=BOTTOM, show_wires=false);
 
-    // USB-C extension-cable female panel mount — flange sits flush against
-    // the OUTER face of the -Y wall, screws go from outside through the
-    // wall into M2 inserts in the inner-wall bosses.
-    // Outer-wall Y at z=USBC_POS_Z (in case world); housing depth is 5mm.
+    // USB-C extension-cable female panel mount — flange sits flush
+    // against the INNER face of the -Y wall (inside the case). Screws
+    // come from outside through wall clearance holes and thread into
+    // the adapter's built-in M2 nuts.
+    // Inner-wall Y at z=USBC_POS_Z; housing depth is 5mm.
     let(taper = (USBC_POS_Z + BOTTOM_DEPTH - PANEL_T) / (BOTTOM_DEPTH - PANEL_T),
-        outer_y = -((CASE_H - 2*TAPER_Y + 2*TAPER_Y * taper) / 2),
+        inner_y = -((CASE_H - 2*TAPER_Y + 2*TAPER_Y * taper) / 2 - WALL_T),
         housing_depth = 5)
     translate([USBC_POS_X,
-               outer_y - housing_depth/2,
+               inner_y + housing_depth/2,
                USBC_POS_Z + (PANEL_T - TOP_DEPTH)])
         usb_c_extension_panel(anchor=CENTER);
 

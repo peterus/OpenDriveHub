@@ -90,30 +90,6 @@ module batt_slot_walls() {
     }
 }
 
-// USB-C extension-cable mounting boss: short cylinder on the inner -Y
-// wall surface, holding an M2 heat-set insert. The screw enters from
-// outside, passes through the wall clearance hole, and threads into the
-// insert. Two of these flank the USB-C cable cutout at 17mm pitch.
-//
-// Module is anchored at the boss's wall-facing face (BOTTOM = -Z local).
-// The insert pocket opens at this face so the insert is pressed in from
-// the wall side and the screw threads into it from outside.
-module usbc_boss() {
-    difference() {
-        cyl(d=USBC_BOSS_OD, l=USBC_BOSS_H, anchor=BOTTOM);
-        translate([0, 0, -0.1])
-            cyl(d=INSERT_M2_POCKET_D,
-                l=INSERT_M2_POCKET_H + 0.1,
-                anchor=BOTTOM);
-    }
-}
-
-// Inner -Y wall Y position at z=USBC_POS_Z (bottom-shell local).
-// Linear interpolation between back-panel (-22) and mating face (0).
-USBC_INNER_Y = -((BOT_BACK_H + (BOT_FRONT_H - BOT_BACK_H) *
-                  ((USBC_POS_Z + BOTTOM_DEPTH - PANEL_T) /
-                   (BOTTOM_DEPTH - PANEL_T))) / 2 - WALL_T);
-
 // Top↔bottom mounting boss in the bottom shell. Sits on the back-panel
 // interior and reaches up to the mating face. Hollow tube — clearance for
 // the M3 screw all the way through to the back panel exterior. Conical
@@ -203,17 +179,6 @@ module bottom_shell() {
                             case_screw_boss_bottom();
             }
 
-            // 2 USB-C extension-cable mounting bosses on the inner -Y
-            // wall, flanking the USB-C cable cutout. The bosses extend
-            // inward (+Y) from the inner wall surface; the M2 insert
-            // pocket opens at the wall side so the screw can thread in
-            // from outside through the wall.
-            for (sx = [-1, 1])
-                translate([USBC_POS_X + sx*USBC_SCREW_PITCH/2,
-                           USBC_INNER_Y,
-                           USBC_POS_Z])
-                    rotate([-90, 0, 0])
-                        usbc_boss();
         }
 
         // ----- Subtractions on the back panel -----
@@ -248,11 +213,13 @@ module bottom_shell() {
                        -BOTTOM_DEPTH - 0.1])
                 cyl(d=COVER_SCREW_CLEAR, l=PANEL_T + 0.2, anchor=BOTTOM);
 
-        // USB-C cable cutout + 2 screw clearance holes through the -Y wall.
-        // All three cuts are oversized in Y (wall-thickness direction) so
-        // the wall taper doesn't leave a sliver of material.
+        // USB-C plug clearance + 2 screw clearance holes through the -Y wall.
+        // Plug opening is generous (USBC_PLUG_CLEAR_W × USBC_PLUG_CLEAR_H)
+        // so even chunky over-moulded cable boots fit. Cuts overshoot the
+        // wall thickness so the taper doesn't leave a sliver.
         translate([USBC_POS_X, -BOT_FRONT_H/2 - 1, USBC_POS_Z])
-            cuboid([USBC_OPENING_W, 20, USBC_OPENING_H], anchor=FRONT);
+            cuboid([USBC_PLUG_CLEAR_W, 20, USBC_PLUG_CLEAR_H],
+                   rounding=USBC_PLUG_CLEAR_R, edges="Y", anchor=FRONT);
         for (sx = [-1, 1])
             translate([USBC_POS_X + sx*USBC_SCREW_PITCH/2,
                        -BOT_FRONT_H/2 - 1,
