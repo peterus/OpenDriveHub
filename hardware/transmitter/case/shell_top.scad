@@ -28,15 +28,25 @@ function rect_path(w, d) = [
 
 // Top↔bottom mounting boss with M3 heat-set insert at its base. Stands on
 // the mating face and extends up into the top shell. The insert pocket
-// opens DOWNWARD so the screw enters from the bottom shell side.
+// opens DOWNWARD so the screw enters from the bottom shell side. Two
+// stiffener fins point at +X and +Y in module-local coords; the placement
+// loop rotates them to align with each case corner's walls.
 module case_screw_boss_top() {
-    difference() {
-        cyl(d=BOSS_OD, l=CASE_BOSS_HEIGHT_TOP, anchor=BOTTOM);
-        // Insert pocket opens at the bottom face (mating side).
-        translate([0, 0, -0.1])
-            cyl(d=INSERT_M3_POCKET_D,
-                l=INSERT_M3_POCKET_H + 0.1,
-                anchor=BOTTOM);
+    h = CASE_BOSS_HEIGHT_TOP;
+    union() {
+        difference() {
+            cyl(d=BOSS_OD, l=h, anchor=BOTTOM);
+            // Insert pocket opens at the bottom face (mating side).
+            translate([0, 0, -0.1])
+                cyl(d=INSERT_M3_POCKET_D,
+                    l=INSERT_M3_POCKET_H + 0.1,
+                    anchor=BOTTOM);
+        }
+        for (rot = [0, 90])
+            rotate([0, 0, rot])
+                translate([BOSS_OD/2, 0, 0])
+                    cuboid([CASE_BOSS_FIN_L, CASE_BOSS_FIN_T, h],
+                           anchor=BOTTOM+LEFT);
     }
 }
 
@@ -86,12 +96,15 @@ module shell_top() {
             }
 
             // 4 corner bosses standing on the mating face. They merge into
-            // the side wall near the panel face for stability.
+            // the side wall near the panel face for stability. The rotation
+            // aims the boss-internal +X/+Y fins toward the corresponding
+            // case-corner walls.
             for (sx = [-1, 1], sy = [-1, 1])
                 translate([sx*CASE_BOSS_OFFSET_X,
                            sy*CASE_BOSS_OFFSET_Y,
                            -(TOP_DEPTH - PANEL_T)])
-                    case_screw_boss_top();
+                    rotate([0, 0, atan2(sy, sx) - 45])
+                        case_screw_boss_top();
         }
 
         // ----- Panel cutouts -----

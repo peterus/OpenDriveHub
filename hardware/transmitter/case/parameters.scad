@@ -70,6 +70,14 @@ CASE_BOSS_HEIGHT_BOT = BOTTOM_DEPTH - PANEL_T;    // full pillar — anchors at 
 CASE_BOSS_FOOT_D     = 10;
 CASE_BOSS_FOOT_H     = 4;
 
+// Stiffener fins from boss to the two nearest walls. Two per boss
+// (cardinal directions toward the case corner), full boss height. The
+// 2.5mm length stays inside the rounded outer corner at the back-panel/
+// front-panel face (smallest cavity due to taper) — going larger pokes
+// through the corner radius.
+CASE_BOSS_FIN_L      = 2.5;
+CASE_BOSS_FIN_T      = 1.5;
+
 // ----- Battery compartment (LiPo cover access on the bottom-shell back) -----
 // Battery is BATT_BODY=[80,35,15]; cover/opening sized with clearance.
 // Position is in case-world XY; battery shifted toward the bottom of the

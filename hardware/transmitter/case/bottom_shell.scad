@@ -93,17 +93,25 @@ module batt_slot_walls() {
 // Top↔bottom mounting boss in the bottom shell. Sits on the back-panel
 // interior and reaches up to the mating face. Hollow tube — clearance for
 // the M3 screw all the way through to the back panel exterior. Conical
-// foot at the base widens the cantilever root for lateral stiffness.
+// foot at the base widens the cantilever root for lateral stiffness, and
+// two stiffener fins (in +X and +Y in module-local coords) tie the boss
+// to the case walls.
 module case_screw_boss_bottom() {
+    h = CASE_BOSS_HEIGHT_BOT;
     difference() {
         union() {
-            cyl(d=BOSS_OD, l=CASE_BOSS_HEIGHT_BOT, anchor=BOTTOM);
+            cyl(d=BOSS_OD, l=h, anchor=BOTTOM);
             cyl(d1=CASE_BOSS_FOOT_D, d2=BOSS_OD,
                 l=CASE_BOSS_FOOT_H, anchor=BOTTOM);
+            for (rot = [0, 90])
+                rotate([0, 0, rot])
+                    translate([BOSS_OD/2, 0, 0])
+                        cuboid([CASE_BOSS_FIN_L, CASE_BOSS_FIN_T, h],
+                               anchor=BOTTOM+LEFT);
         }
         translate([0, 0, -0.1])
             cyl(d=COVER_SCREW_CLEAR,
-                l=CASE_BOSS_HEIGHT_BOT + 0.2,
+                l=h + 0.2,
                 anchor=BOTTOM);
     }
 }
@@ -152,12 +160,15 @@ module bottom_shell() {
                 batt_slot_walls();
 
             // 4 case-corner bosses with M3 screw clearance for fastening
-            // the bottom shell to the top shell.
+            // the bottom shell to the top shell. Rotation aims the
+            // boss-internal +X/+Y fins toward the corresponding case
+            // corner's walls.
             for (sx = [-1, 1], sy = [-1, 1])
                 translate([sx*CASE_BOSS_OFFSET_X,
                            sy*CASE_BOSS_OFFSET_Y,
                            -BOTTOM_DEPTH + PANEL_T])
-                    case_screw_boss_bottom();
+                    rotate([0, 0, atan2(sy, sx) - 45])
+                        case_screw_boss_bottom();
         }
 
         // ----- Subtractions on the back panel -----
