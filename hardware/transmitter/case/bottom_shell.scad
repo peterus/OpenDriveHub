@@ -92,10 +92,15 @@ module batt_slot_walls() {
 
 // Top↔bottom mounting boss in the bottom shell. Sits on the back-panel
 // interior and reaches up to the mating face. Hollow tube — clearance for
-// the M3 screw all the way through to the back panel exterior.
+// the M3 screw all the way through to the back panel exterior. Conical
+// foot at the base widens the cantilever root for lateral stiffness.
 module case_screw_boss_bottom() {
     difference() {
-        cyl(d=BOSS_OD, l=CASE_BOSS_HEIGHT_BOT, anchor=BOTTOM);
+        union() {
+            cyl(d=BOSS_OD, l=CASE_BOSS_HEIGHT_BOT, anchor=BOTTOM);
+            cyl(d1=CASE_BOSS_FOOT_D, d2=BOSS_OD,
+                l=CASE_BOSS_FOOT_H, anchor=BOTTOM);
+        }
         translate([0, 0, -0.1])
             cyl(d=COVER_SCREW_CLEAR,
                 l=CASE_BOSS_HEIGHT_BOT + 0.2,

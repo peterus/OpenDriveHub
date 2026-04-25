@@ -63,8 +63,12 @@ BOSS_INSERT_H   = INSERT_M3_POCKET_H;
 // Screw: M3 x 40 (5mm thread engagement into the insert).
 CASE_BOSS_OFFSET_X   = 129;
 CASE_BOSS_OFFSET_Y   = 56;
-CASE_BOSS_HEIGHT_TOP = 13;                        // mating face up
-CASE_BOSS_HEIGHT_BOT = BOTTOM_DEPTH - PANEL_T;    // back panel up to mating
+CASE_BOSS_HEIGHT_TOP = TOP_DEPTH - PANEL_T;       // full pillar — anchors at panel
+CASE_BOSS_HEIGHT_BOT = BOTTOM_DEPTH - PANEL_T;    // full pillar — anchors at back panel
+// Conical foot at the bottom-shell boss base. Widens the moment of inertia
+// at the cantilever root so the tower doesn't snap off under lateral load.
+CASE_BOSS_FOOT_D     = 10;
+CASE_BOSS_FOOT_H     = 4;
 
 // ----- Battery compartment (LiPo cover access on the bottom-shell back) -----
 // Battery is BATT_BODY=[80,35,15]; cover/opening sized with clearance.
