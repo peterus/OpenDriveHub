@@ -25,20 +25,21 @@ function rect_path(w, d) = [
     [-w/2,  d/2]
 ];
 
-// Bottom-shell taper goes INVERSE to the top-shell's: the back panel is
-// BIGGER than the mating face, so the assembled case bulges out at both
-// ends and is narrowest at the middle (mating rim) — gives a "barrel"
-// silhouette like the reference photo, instead of a continuous wedge.
+// Bottom-shell tapers INWARD going from mating face to back panel —
+// matching the top-shell which now also tapers inward going from mating
+// to front panel. The mating rim is the WIDEST point of the assembled
+// case; both ends taper down to a smaller panel face. This gives the
+// "barrel" / belly silhouette where the middle bulges outward.
 BOT_TAPER_X = TAPER_X;
 BOT_TAPER_Y = TAPER_Y;
 
-// Mating-face dimensions (must equal top-shell's back-rim dimensions).
-BOT_FRONT_W = CASE_W - 2*TAPER_X;
-BOT_FRONT_H = CASE_H - 2*TAPER_Y;
+// Mating-face dimensions (must equal top-shell's back-rim dimensions = CASE_W/H).
+BOT_FRONT_W = CASE_W;
+BOT_FRONT_H = CASE_H;
 
-// Back-panel dimensions (bigger than mating — inverse taper).
-BOT_BACK_W = BOT_FRONT_W + 2*BOT_TAPER_X;
-BOT_BACK_H = BOT_FRONT_H + 2*BOT_TAPER_Y;
+// Back-panel dimensions (smaller — taper inward).
+BOT_BACK_W = BOT_FRONT_W - 2*BOT_TAPER_X;
+BOT_BACK_H = BOT_FRONT_H - 2*BOT_TAPER_Y;
 
 // =============================================================================
 module bottom_shell() {

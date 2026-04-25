@@ -37,11 +37,15 @@ module shell_top() {
     // than being subtracted. Always use F6 to inspect the real result.
 
     difference() {
+        // Outer: prismoid where the BIG end is at the bottom (mating rim)
+        // and the SMALL end is at the top (front panel). The case bulges
+        // out at the middle (mating) and tapers inward toward the panel
+        // face — gives the "barrel" silhouette.
         diff()
         translate([0, 0, PANEL_T])
             prismoid(
-                size1=[CASE_W - 2*TAPER_X, CASE_H - 2*TAPER_Y],
-                size2=[CASE_W,              CASE_H            ],
+                size1=[CASE_W,              CASE_H            ],   // mating rim, BIG
+                size2=[CASE_W - 2*TAPER_X, CASE_H - 2*TAPER_Y],   // front panel, SMALL
                 h=TOP_DEPTH,
                 rounding=CORNER_R,
                 anchor=TOP
@@ -51,12 +55,12 @@ module shell_top() {
                     mask2d_roundover(r=TOP_EDGE_R);
             };
 
-        // Inner cavity — same taper, smaller by wall thickness, no joint.
+        // Inner cavity — same taper, smaller by wall thickness.
         translate([0, 0, 0.1])
             prismoid(
-                size1=[CASE_W - 2*TAPER_X - 2*WALL_T,
+                size1=[CASE_W - 2*WALL_T, CASE_H - 2*WALL_T],
+                size2=[CASE_W - 2*TAPER_X - 2*WALL_T,
                        CASE_H - 2*TAPER_Y - 2*WALL_T],
-                size2=[CASE_W - 2*WALL_T, CASE_H - 2*WALL_T],
                 h=TOP_DEPTH - PANEL_T + 0.2,
                 rounding=max(CORNER_R - WALL_T, 0.5),
                 anchor=TOP
