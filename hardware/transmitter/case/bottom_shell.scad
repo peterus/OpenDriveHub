@@ -72,6 +72,18 @@ module bottom_shell() {
                 rounding=max(CORNER_R - WALL_T, 0.5),
                 anchor=BOTTOM
             );
+
+        // ----- Battery cover: recess on the exterior + through-hole -----
+
+        // Recess so the cover sits flush with the back-panel surface.
+        translate([BATT_POS_X, BATT_POS_Y, -BOTTOM_DEPTH - 0.1])
+            cuboid([BATT_COVER_W, BATT_COVER_H, BATT_COVER_RECESS + 0.1],
+                   rounding=BATT_COVER_R, edges="Z", anchor=BOTTOM);
+
+        // Through-hole for battery access (penetrates the remaining back-panel).
+        translate([BATT_POS_X, BATT_POS_Y, -BOTTOM_DEPTH - 0.1])
+            cuboid([BATT_OPENING_W, BATT_OPENING_H, PANEL_T + 0.2],
+                   rounding=BATT_COVER_R, edges="Z", anchor=BOTTOM);
     }
 }
 

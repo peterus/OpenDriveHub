@@ -49,6 +49,20 @@ BOSS_OD         = 7;
 BOSS_INSERT_D   = INSERT_M3_POCKET_D;
 BOSS_INSERT_H   = INSERT_M3_POCKET_H;
 
+// ----- Battery compartment (LiPo cover access on the bottom-shell back) -----
+// Battery is BATT_BODY=[80,35,15]; cover/opening sized with clearance.
+// Position is in case-world XY (back-panel face is at z=-TOP_DEPTH-BOTTOM_DEPTH+PANEL_T).
+BATT_POS_X        = 0;
+BATT_POS_Y        = 0;
+BATT_OPENING_W    = 82;     // through-hole for battery insertion (battery + 1mm/side)
+BATT_OPENING_H    = 37;
+BATT_COVER_W      = 92;     // cover plate footprint (5mm overhang on every side)
+BATT_COVER_H      = 47;
+BATT_COVER_T      = 2;      // cover plate thickness — equals RECESS for flush fit
+BATT_COVER_RECESS = 2;      // depth of recess in back-panel so cover sits flush
+                            // (back-panel left at PANEL_T-RECESS=1mm in cover area)
+BATT_COVER_R      = 2;      // corner rounding on the cover plate
+
 // =============================================================================
 // Layout positions duplicated from parts/layout_front.scad.
 // MUST match the layout file. If you change positions there, update here too.
