@@ -52,7 +52,13 @@ Avoid: check datasheet for *panel cutout* dimension, not just part OD. Those are
 Failure: two solids share a volume (e.g. pot body sitting *inside* the base plate instead of under it). Renders look plausible because one solid hides the overlap; CGAL unions them so the bounding box is smaller than the sum of parts.
 Avoid: cross-check `analyze_model` bounding-box height against the sum of your nominal Z heights. If they disagree by more than ~0.1mm (polygon faceting), there's an overlap or gap somewhere.
 
-## 11. Library path forgotten between sessions
+## 11. BOSL2 tagged-diff doesn't render in F5 preview
+
+Failure: code uses `diff()` + `edge_profile()` (or similar tagged BOSL2 ops). User opens the file in OpenSCAD, hits F5, and sees translucent mask geometry sitting on the part — looks like there are gaps or extra material. Reports it's "broken".
+Root cause: BOSL2's tagged operations (`diff()`, `tag()`, `edge_profile()`, `corner_profile()`, etc.) only resolve correctly under CGAL render (F6). In OpenCSG preview (F5) the tags appear as translucent overlay geometry.
+Avoid: always preview tagged-BOSL2 SCAD with F6, not F5. Or refactor to plain `difference()` if F5-correctness matters. Document the caveat in a comment near the `diff()` call so users know to render with F6.
+
+## 12. Library path forgotten between sessions
 
 Failure: next session, `use <BOSL2/std.scad>` fails because libs were cloned into a non-default dir or removed.
 Avoid: libraries live at `~/.local/share/OpenSCAD/libraries/`. If `openscad --info` doesn't list your library path, something's off. Don't bundle BOSL2/NopSCADlib into the repo — reference them.

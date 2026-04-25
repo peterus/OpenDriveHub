@@ -28,16 +28,15 @@ function rect_path(w, d) = [
 
 // =============================================================================
 module shell_top() {
-    // Strategy: the outer is a tapered prismoid (rounded vertical corners,
-    // sharp top-face edges by default). We then use BOSL2's `diff()` +
-    // `edge_profile()` to apply a roundover mask to the 4 top-face edges
-    // so the front face flows smoothly into the side walls.
-    // Inner cavity is a plain prismoid that matches the taper.
+    // Outer = tapered prismoid (rounded vertical corners) with a roundover
+    // applied to its 4 top-face edges via BOSL2 diff() + edge_profile().
+    //
+    // IMPORTANT: this uses tagged geometry. It renders correctly in F6
+    // (CGAL render) and via openscad-mcp / openscad-cli. In F5 (OpenCSG
+    // preview) the mask geometry shows as a translucent overlay rather
+    // than being subtracted. Always use F6 to inspect the real result.
 
     difference() {
-        // Outer shell with top-face roundover (edge_profile) and a spherical
-        // blend at the 4 top-vertical corners (corner_profile) so the small
-        // top-edge round merges smoothly into the larger vertical-corner round.
         diff()
         translate([0, 0, PANEL_T])
             prismoid(
