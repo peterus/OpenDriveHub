@@ -129,6 +129,18 @@ BATT_LID_R        = BATT_COVER_R;
 // M3 clearance hole for the screws (slightly oversized for FDM tolerance).
 COVER_SCREW_CLEAR = 3.5;
 
+// ----- USB-C breakout mounting (parts/usb_c_breakout.scad) -----
+// Breakout sits flat against the back-panel interior with the receptacle
+// poking through the -Y side wall. Long PCB axis runs along -Y; mounting
+// holes are 17mm apart along that axis.
+USBC_POS_X        = 80;       // X centre along the -Y wall
+USBC_PCB_CENTER_Y = -50;      // PCB centre Y (long-axis midpoint)
+USBC_STANDOFF_H   = 7;        // PCB bottom above back-panel interior
+USBC_STANDOFF_OD  = 5;        // outer diameter of mounting standoff
+USBC_HOLE_PITCH_CASE = 17;    // mirrors USBC_HOLE_PITCH from the breakout part
+USBC_OPENING_W    = 9.4;      // cable-entry cutout width (X-axis)
+USBC_OPENING_H    = 3.7;      // cable-entry cutout height (Z-axis)
+
 // =============================================================================
 // Layout positions duplicated from parts/layout_front.scad.
 // MUST match the layout file. If you change positions there, update here too.

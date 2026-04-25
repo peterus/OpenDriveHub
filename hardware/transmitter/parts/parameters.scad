@@ -21,6 +21,12 @@ INSERT_M3_LEN  = 4.0;
 INSERT_M3_POCKET_D = INSERT_M3_OD - 0.1;
 INSERT_M3_POCKET_H = INSERT_M3_LEN + 0.5;
 
+// --- Heat-set insert pocket (M2, 3mm OD, 4mm length) ---
+INSERT_M2_OD   = 3.0;
+INSERT_M2_LEN  = 4.0;
+INSERT_M2_POCKET_D = INSERT_M2_OD - 0.1;
+INSERT_M2_POCKET_H = INSERT_M2_LEN + 0.5;
+
 // --- Assembly visualization ---
 EXPLODE        = 0;            // 0 = assembled; >0 separates parts along Z for preview
 

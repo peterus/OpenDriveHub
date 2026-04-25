@@ -90,6 +90,20 @@ module batt_slot_walls() {
     }
 }
 
+// USB-C breakout mounting standoff: short cylinder with M2 insert pocket
+// at the top. Two of these stand at the breakout's mounting-hole positions
+// on the back-panel interior; the M2 screw pulls the breakout PCB down
+// against the standoff top.
+module usbc_standoff() {
+    difference() {
+        cyl(d=USBC_STANDOFF_OD, l=USBC_STANDOFF_H, anchor=BOTTOM);
+        translate([0, 0, USBC_STANDOFF_H + 0.1])
+            cyl(d=INSERT_M2_POCKET_D,
+                l=INSERT_M2_POCKET_H + 0.1,
+                anchor=TOP);
+    }
+}
+
 // Top↔bottom mounting boss in the bottom shell. Sits on the back-panel
 // interior and reaches up to the mating face. Hollow tube — clearance for
 // the M3 screw all the way through to the back panel exterior. Conical
@@ -178,6 +192,13 @@ module bottom_shell() {
                         rotate([0, 0, atan2(sy, sx) - 45])
                             case_screw_boss_bottom();
             }
+
+            // 2 USB-C breakout mounting standoffs on the back panel.
+            for (sy = [-1, 1])
+                translate([USBC_POS_X,
+                           USBC_PCB_CENTER_Y + sy*USBC_HOLE_PITCH_CASE/2,
+                           -BOTTOM_DEPTH + PANEL_T])
+                    usbc_standoff();
         }
 
         // ----- Subtractions on the back panel -----
@@ -211,6 +232,19 @@ module bottom_shell() {
                        sy*CASE_BOSS_OFFSET_Y,
                        -BOTTOM_DEPTH - 0.1])
                 cyl(d=COVER_SCREW_CLEAR, l=PANEL_T + 0.2, anchor=BOTTOM);
+
+        // USB-C cable cutout in the -Y side wall. Cuboid extends well past
+        // both inner and outer wall surfaces so it cleanly cuts through
+        // even with the wall taper.
+        // Cable axis Z = back-panel-interior + USBC_STANDOFF_H + PCB_T + USBC_CONN_H/2
+        //              ≈ -BOTTOM_DEPTH + PANEL_T + 7 + 0.8 + 1.65 = -11.55 (bottom local)
+        translate([USBC_POS_X,
+                   -BOT_FRONT_H/2 - 1,                    // outside the wall
+                   -BOTTOM_DEPTH + PANEL_T + USBC_STANDOFF_H + 1.6 + 1.65])
+            cuboid([USBC_OPENING_W,
+                    20,                                   // through whole wall + slack
+                    USBC_OPENING_H],
+                   anchor=FRONT);
     }
 }
 
