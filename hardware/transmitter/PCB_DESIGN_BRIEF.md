@@ -17,8 +17,10 @@ DIY RC transmitter, "Mode 2" landscape format, ~286 × 136 mm panel.
 - ESP32 controller (module choice TBD; ESP32-S3 WROOM-1 likely)
 - 4.0" ST7796 IPS display (480×320) with FT6236 capacitive touch
 - 2S LiPo, 2000 mAh nominal, USB-C charging via IP5389
-- 7 sub-panel PCBs handling switches/buttons/encoders, all bridged to
-  the main PCB via a shared I2C bus + PCF8574 I/O expanders
+- 7 sub-panel PCBs handling switches/buttons/encoders, fanned out via a
+  TCA9548A I²C multiplexer on the main PCB so each sub-PCB sits on its
+  own private downstream channel (all use the default PCF8574A address
+  0x38 — no per-board jumpering, no collisions)
 - 28 mm speaker (audio feedback / RX telemetry alarms)
 
 The case shell is locked in (top + bottom shell, battery cover, battery
@@ -43,14 +45,16 @@ walls, joystick bodies, or the battery compartment.
    │  · IP5389 charger / boost controller (8.4V LiPo ↔ 5V)   │
    │  · 3.3V LDO/buck for ESP32 + I/O expanders              │
    │  · ESP32-S3 WROOM-1 module (or equivalent)              │
-   │  · ST7796 display interface (SPI)                       │
-   │  · FT6236 touch interface (I2C — shared bus)            │
+   │  · ST7796 display interface (SPI, direct from ESP32)    │
+   │  · TCA9548A I²C multiplexer (1 upstream → 8 downstream) │
+   │      ch 0..6: 7 sub-PCB headers (5-pin JST-XH each)     │
+   │      ch 7   : FT6236 touch controller                   │
    │  · Audio amp (PAM8403 or similar) → 28mm speaker        │
    │  · 2× joystick ADC headers (5-pin: V, GND, X, Y, SW)    │
-   │  · 7× sub-PCB connectors (4-pin: V, GND, SDA, SCL)      │
    │  · LiPo + balance connector (JST-XH 3-pin for 2S)       │
    └────┬────────────────────────────────────────────────────┘
-        │ I2C bus (SDA, SCL, 3.3V, GND)
+        │ TCA9548A downstream channels (each is its own
+        │ private I²C bus: 3.3V, GND, SDA, SCL + INT line)
         │
    ┌────┴────┬────────┬────────┬────────┬────────┬────────┐
    ▼         ▼        ▼        ▼        ▼        ▼        ▼
@@ -58,47 +62,72 @@ walls, joystick bodies, or the battery compartment.
  (-X top)(+X top)(-X bot)(+X bot) (-X bot) (+X bot)(centre bot)
 ```
 
-All sub-PCBs carry a PCF8574 8-bit I/O expander, all on the same I2C
-bus. Use **PCF8574A** if 8 expanders end up sharing the bus (the touch
-controller eats one PCF8574 address; PCF8574A has a different address
-block to avoid the collision).
+All sub-PCBs carry a **PCF8574A** 8-bit I/O expander at the default
+address **0x38** (A0=A1=A2 tied to GND on the sub-PCB silkscreen-and-
+copper). Address conflicts are impossible because the TCA9548A on the
+main PCB only enables one downstream channel at a time — every
+sub-PCB lives in its own private bus segment. No per-board jumpering
+required.
+
+Each sub-PCB also exposes its PCF8574A's open-drain `/INT` pin to the
+main PCB, so the firmware can sleep until input changes instead of
+polling. Pull-up for `/INT` lives on the main PCB.
 
 ---
 
 ## 3. PCB list
 
-| # | PCB           | Qty | Purpose                                      | Approx. footprint  |
-| - | ------------- | --- | -------------------------------------------- | ------------------ |
-| 1 | `main`        | 1   | brain, charging, display, audio, I2C master  | ~80 × 60 × 1.6 mm  |
-| 2 | `toggle3`     | 2   | 3 long-bat toggles + PCF8574                 | ~60 × 30 × 1.6 mm  |
-| 3 | `illum3`      | 2   | 3 illuminated buttons + PCF8574              | ~60 × 30 × 1.6 mm  |
-| 4 | `encoder1`    | 2   | 1 EC11 encoder + PCF8574                     | ~25 × 25 × 1.6 mm  |
-| 5 | `nav3`        | 1   | 3 tact buttons + PCF8574                     | ~35 × 25 × 1.6 mm  |
+| # | PCB           | Qty | Purpose                                      | Outline           | Status |
+| - | ------------- | --- | -------------------------------------------- | ----------------- | ------ |
+| 1 | `main`        | 1   | brain, charging, display, audio, I²C mux     | ~80 × 60 × 1.6 mm | TBD    |
+| 2 | `toggle3`     | 2   | 3 long-bat toggles + PCF8574A                | ~60 × 30 × 1.6 mm | TBD    |
+| 3 | `illum3`      | 2   | 3 illuminated buttons + PCF8574A             | ~60 × 30 × 1.6 mm | TBD    |
+| 4 | `encoder1`    | 2   | 1 EC11 encoder + PCF8574A                    | ~30 × 30 × 1.6 mm | TBD    |
+| 5 | `nav3`        | 1   | 3 tact buttons + PCF8574A                    | **32 × 30 × 1.6 mm** | **DONE** (`pcb/nav3/`) |
 
 Sub-PCB footprints are estimates — the real bound is "must fit under
-the corresponding panel cutout cluster without poking outside the case
-wall". Cluster spans (X axis) from `parts/layout_front.scad`:
+the corresponding panel cutout cluster, leave room for SOIC-16W IC
+plus 4 corner mount holes plus a 5-pin JST-XH connector, and not poke
+outside the case cavity". Cluster spans (X axis) from
+`parts/layout_front.scad`:
 
-- **toggle3**: 3 toggles 18 mm apart → 36 mm switch span; allow ~12 mm
-  margin → ~60 mm wide.
-- **illum3**: 3 illum buttons 18 mm apart → 36 mm; same margin → 60 mm.
-- **encoder1**: single encoder, ~12 × 12 mm body → 25 mm wide PCB.
-- **nav3**: 3 tact buttons 10 mm apart → 20 mm switch span → 35 mm wide.
+- **toggle3**: 3 toggles 18 mm apart → 36 mm switch span; ~60 mm wide
+- **illum3**: 3 illum buttons 18 mm apart → 36 mm span; ~60 mm wide
+- **encoder1**: single encoder, ~12 × 12 mm body; ~30 mm both axes
+- **nav3**: 3 tact buttons 10 mm apart → 20 mm switch span; 32 mm wide
 
-Y-axis (height) of each sub-PCB: aim for ~30 mm so the cluster fits
+**Sizing reality check from nav3** (the first board through KiCad):
+the original 32 × 16 mm estimate was too short — the SOIC-16W body of
+the PCF8574A on B.Cu plus 4× M2 corner mounts (3 mm inset) plus a
+JST-XH 5-pin connector at one edge needed **32 × 30 mm**. Expect the
+other sub-PCB outlines (especially encoder1 at "25 × 25") to grow
+similarly when actually laid out.
+
+Y-axis (height) of each sub-PCB: target ≤ 30 mm so the cluster fits
 between panel and 27 mm of cavity (TOP_DEPTH 30 − PANEL_T 3 = 27 mm).
-Sub-PCB sits 1-2 mm above its panel bushings (component bodies clear
-the PCB) — so PCB Z position is roughly panel_interior − 16 to −20 mm
-in case coords.
+Sub-PCB sits 3-4 mm below the panel-mating face (the SUBPCB_Z_*
+constants in `parts/layout_front.scad` are the source of truth);
+component bodies hang below the PCB into the cavity.
 
-Connector on each sub-PCB: 4-pin 2.54 mm header (or JST-PH 4) with
-**3.3V, GND, SDA, SCL**.
+**Connector** on each sub-PCB: 5-pin **JST-XH** 2.5 mm vertical header
+(B5B-XH-A or equivalent), oriented so the cable exits toward the back
+of the case. Pinout (matching nav3):
 
-PCF8574 wiring on each sub-PCB:
-- Address pins A0/A1/A2 set per PCB (jumper or hard-wired) so all 7
-  share one bus
-- 8 GPIO pins drive button/switch inputs to ground (with internal
-  pull-ups). Encoder needs 2 inputs for A/B + 1 for switch = 3 pins.
+| Pin | Net      |
+|-----|----------|
+| 1   | 3V3      |
+| 2   | GND      |
+| 3   | I2C_SDA  |
+| 4   | I2C_SCL  |
+| 5   | /INT     |
+
+**PCF8574A wiring** on each sub-PCB (default address 0x38):
+- A0/A1/A2 hard-tied to GND
+- 8 GPIO pins drive switch/button/encoder inputs to ground (internal
+  weak pull-ups hold high at rest)
+- /INT (open-drain) goes out on connector pin 5; pull-up lives on the
+  main PCB
+- 100 nF decoupling on VDD/VSS, 0805 metric (hand-solder friendly)
 
 ---
 
@@ -232,18 +261,25 @@ ESP32-S3-WROOM-1 (recommended) or ESP32-WROOM-32E:
 S3 has native USB so the USB-C port can also be used for serial /
 firmware upload directly to the ESP32 without an external USB-UART.
 
-### 4.12 PCF8574 / PCF8574A I/O expanders (×7)
+### 4.12 PCF8574A I/O expanders (×7)
 
-- 8-bit I/O expander, I2C interface
-- Address: 3 select pins → 8 unique addresses
-- PCF8574: 0x20-0x27
-- PCF8574A: 0x38-0x3F
-- TSSOP-20 or SOIC-20 package
-- Built-in pull-ups not super strong, may need external 4.7 kΩ on SDA/SCL
+- 8-bit I/O expander, I²C interface
+- Default address **0x38** (A0=A1=A2 to GND on every sub-PCB — no
+  per-board configuration; the TCA9548A on the main PCB isolates each
+  sub-PCB on its own bus segment)
+- SOIC-16W (`Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm`) — large enough
+  to hand-solder, large enough to drive sub-PCB minimum height
+- Open-drain `/INT` pin out → connector pin 5 on every sub-PCB
+- 100 nF X7R 0805 decoupling cap right next to VDD/VSS
 
-7 expanders fit in 8 addresses of one part. Use PCF8574 for 7 sub-PCBs;
-keep PCF8574A range free in case the FT6236 touch controller's address
-collides (FT6236 default = 0x38).
+### 4.13 TCA9548A I²C multiplexer (main PCB)
+
+- 8-channel I²C switch
+- Address 0x70 (configurable via A0/A1/A2 if needed)
+- Each downstream channel gets its own 4.7 kΩ SDA/SCL pull-ups on the
+  main PCB (PCF8574A pull-ups on the sub-PCBs are too weak)
+- Drives 7 sub-PCB connectors + 1 channel for the FT6236 touch IC
+- TSSOP-24 package, 3.3V supply
 
 ---
 
@@ -282,13 +318,16 @@ Available cavity inside top shell: ≈ 268 × 122 × 27 mm.
 
 ### 6.1 Sub-PCB to main PCB (×7)
 
-4-wire ribbon or JST-PH 4-pin: **3.3V, GND, SDA, SCL**.
+5-wire JST-XH 2.5 mm: **3.3V, GND, SDA, SCL, /INT** (in that pin
+order, matching nav3 ref board).
 
 Length: 100-200 mm typical (long enough to route around the joysticks
 and battery without strain).
 
-Recommended connector on main PCB: 7 × JST-PH 4 (4-pin, 2.0 mm pitch),
-laid out so each cable goes to its nearest cluster.
+Recommended connector on main PCB: 7 × JST-XH 5-pin vertical headers
+(B5B-XH-A or compatible), laid out so each cable goes to its nearest
+sub-PCB cluster. Each header is wired to one downstream channel of
+the TCA9548A.
 
 ### 6.2 Joystick to main PCB (×2)
 
@@ -338,8 +377,13 @@ USB-C 5V/3A   ─→ IP5389 ─→ 2S charging  (8.4V max)
 Open: ESP32-S3 needs 3.3V; the WROOM-1 module includes its own LDO so
 the input can be either 3.3V or 5V — pick the cleaner rail.
 
-I2C pull-ups: 4.7 kΩ on SDA and SCL on the **main PCB only** — the
-sub-PCBs have a single PCF8574 each and shouldn't add their own.
+I²C pull-ups: 4.7 kΩ on SDA and SCL on the **main PCB only**, one
+pair per downstream TCA9548A channel (so 8 pairs in total). Sub-PCBs
+add nothing — the PCF8574A's internal weak pull-ups drive the switch
+inputs but the bus pull-ups stay on the main side.
+
+`/INT` lines from each sub-PCB also need a pull-up on the main PCB
+(open-drain). 10 kΩ is fine.
 
 ---
 
@@ -350,8 +394,9 @@ sub-PCBs have a single PCF8574 each and shouldn't add their own.
 - Illuminated button exact bushing thread (M12 vs M16) — measure
 - Display module: confirm SPI vs parallel RGB; confirm FT6236 vs another
   touch IC
-- Tact button spacing on `nav3` PCB: case layout uses 10 mm but verify
-  the chosen part has compatible pad pitch
+- Tact button spacing on `nav3` PCB: confirmed 10 mm (matches the case
+  layout) — use the same `Button_Switch_THT:SW_PUSH_6mm_H5mm` footprint
+  for consistency on toggle3 substitutes if needed
 - Audio amp choice: PAM8403 (class-D, 3W stereo) vs simpler
 - Speaker connector: solder pads vs JST
 - ESP32 variant: S3 (native USB, more I/O) vs classic (cheaper, more
@@ -367,35 +412,121 @@ sub-PCBs have a single PCF8574 each and shouldn't add their own.
 
 ```
 hardware/transmitter/
-├── parts/                   ← OpenSCAD vitamins (source of truth for dims)
+├── parts/                       ← OpenSCAD vitamins + KiCad-exported PCBs
 │   ├── battery.scad
 │   ├── button_illuminated.scad
 │   ├── button_tact.scad
 │   ├── display.scad
 │   ├── encoder.scad
 │   ├── joystick.scad
-│   ├── layout_front.scad    ← CENTRAL layout positions
+│   ├── layout_front.scad        ← CENTRAL layout positions
 │   ├── parameters.scad
+│   ├── pcb_subpanel.scad        ← parametric placeholders + STL imports
 │   ├── speaker.scad
 │   ├── toggle_switch.scad
 │   ├── usb_c_extension_cable.scad
-│   └── utils.scad
-├── case/                    ← OpenSCAD case shell
+│   ├── utils.scad
+│   ├── nav3_actual.step         ← canonical KiCad STEP, tracked
+│   ├── nav3_actual.stl          ← regenerated from STEP, gitignored
+│   └── step_to_stl.py           ← FreeCAD headless conversion script
+├── case/                        ← OpenSCAD case shell + printed parts
 │   ├── parameters.scad
 │   ├── top_shell.scad
 │   ├── bottom_shell.scad
 │   ├── battery_cover.scad
 │   ├── battery_lid.scad
+│   ├── nav_button_cap.scad
 │   └── assembly_check.scad
-└── PCB_DESIGN_BRIEF.md      ← THIS FILE
+├── pcb/                         ← KiCad projects, one folder per board
+│   ├── nav3/                    ← DONE: see pcb/nav3/STATUS.md, BOM.md
+│   │   ├── nav3.kicad_pro
+│   │   ├── nav3.kicad_sch
+│   │   ├── nav3.kicad_pcb
+│   │   ├── nav3.kicad_dru
+│   │   ├── nav3_local.kicad_sym
+│   │   ├── sym-lib-table
+│   │   ├── BOM.md
+│   │   ├── STATUS.md
+│   │   ├── build_pcb_layout.py  ← deterministic PCB regeneration
+│   │   ├── fix_kicad9_compat.py
+│   │   ├── fix_pcb_nets.py
+│   │   ├── place_footprints.py
+│   │   └── pcb_sync_bypass.py
+│   ├── toggle3/                 ← TODO
+│   ├── illum3/                  ← TODO
+│   ├── encoder1/                ← TODO
+│   └── main/                    ← TODO
+└── PCB_DESIGN_BRIEF.md          ← THIS FILE
 ```
 
-KiCad project should live alongside, e.g. `hardware/transmitter/pcb/`
-with a sub-directory per board (`pcb/main/`, `pcb/toggle3/`, etc.).
+When a board is finalised:
+1. KiCad → `kicad-cli pcb export step <board>.kicad_pcb -o <board>.step`
+2. Copy STEP → `parts/<board>_actual.step` (commit this)
+3. `STEP_IN=parts/<board>_actual.step STL_OUT=parts/<board>_actual.stl
+   freecadcmd parts/step_to_stl.py` (STL is gitignored — regenerate
+   locally from the committed STEP)
+4. Update `parts/pcb_subpanel.scad` to import the new STL (mirror the
+   `subpanel_pcb_nav3()` pattern: `USE_REAL_PCB` toggle, `<NAME>_STL_OFFSET`
+   computed from the KiCad board outline, `render(convexity=10) import(...)`
+   wrap so F6 in OpenSCAD shows the imported geometry correctly)
+5. Adjust the layout offset in `parts/layout_front.scad` if the KiCad
+   board centroid doesn't match the panel cutout cluster centre (nav3
+   needed a `-5` mm Y shift because switches sit "north" of centroid)
 
-When PCB outlines & mounting hole positions are finalised, mirror them
-back into `parts/<pcb_name>.scad` so the case can model the standoffs
-that hold each PCB.
+---
+
+## 9.5 Lessons learned from nav3 (read before starting the next board)
+
+These bit us during nav3 and will bite again unless avoided:
+
+**KiCad / kicad-mcp-pro on KiCad 9.0.7 has known headless bugs.** The
+nav3 directory carries `fix_kicad9_compat.py`, `fix_pcb_nets.py`,
+`pcb_sync_bypass.py`, `place_footprints.py` as workaround scripts.
+Re-run them after every batch of MCP edits. For a small board, the
+pragmatic split is: **schematic + nets via scripts/MCP; placement +
+routing in the KiCad GUI; export + DRC via `kicad-cli`**.
+
+**Net mapping bug**: kicad-mcp-pro v2.4.x assigns every PCB pad to
+`+3V3` after schematic-derived sync. Always re-run `fix_pcb_nets.py`
+before checking the ratsnest.
+
+**Schematic file format**: kicad-mcp-pro emits KiCad-10 (date stamp
+20250316), KiCad 9.0.7 wants KiCad-9 (20240920). `fix_kicad9_compat.py`
+downgrades the format and inlines `extends`-based symbols (KiCad 9
+can't load PCF8574AT-extends-PCF8574; the script flattens it into a
+standalone symbol in `<board>_local.kicad_sym`).
+
+**Reference designators must NOT start with `#`** (MCP skips those
+when syncing footprints). Non-electrical decorations like OSHW logos
+need a real-looking ref like `LOGO101`.
+
+**STEP-to-STL gotcha**: KiCad's STEP export carries the PCB body, IC
+bodies, connector body, etc. as separate solids that share faces.
+OpenSCAD's CGAL backend (F6) rejects this as non-manifold and silently
+drops geometry. `step_to_stl.py` already handles this by FreeCAD-fusing
+all solids before tessellation, and `pcb_subpanel.scad` wraps the
+import in `render()` as belt-and-braces. **Keep both.** If you change
+the FreeCAD pipeline, run `admesh nav3_actual.stl` and confirm that
+"Number of parts" stays in the single digits — high counts mean the
+fuse failed.
+
+**KiCad screen-Y vs STEP-Y**: KiCad PCB editor uses screen-style Y
+(positive = down), STEP/STL use right-handed Y (positive = up). The
+`<NAME>_STL_OFFSET` in `pcb_subpanel.scad` corrects for this; if a
+new board appears mirrored after import, double-check the sign of
+the Y components in the offset.
+
+**Switch centroid != PCB centroid**: nav3's switches are 5 mm "north"
+of the PCB centre because the connector takes the bottom edge. The
+fix lives in `parts/layout_front.scad` (`translate([0, NAV_BTN_Y - 5,
+SUBPCB_Z_NAV])`). Each new sub-PCB will need its own offset measured
+once and hard-coded.
+
+**Outline grew from estimate**: nav3 ended up at 32 × 30 mm vs the
+original 32 × 16 mm guess. The driver was the SOIC-16W IC body on
+B.Cu plus 4 corner mounts plus the JST-XH 5-pin connector. Plan for
+similar growth on the other sub-PCBs — the design brief estimates
+are minimums, not hard limits.
 
 ---
 
