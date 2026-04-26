@@ -438,20 +438,18 @@ hardware/transmitter/
 │   ├── nav_button_cap.scad
 │   └── assembly_check.scad
 ├── pcb/                         ← KiCad projects, one folder per board
-│   ├── nav3/                    ← DONE: see pcb/nav3/STATUS.md, BOM.md
-│   │   ├── nav3.kicad_pro
-│   │   ├── nav3.kicad_sch
-│   │   ├── nav3.kicad_pcb
-│   │   ├── nav3.kicad_dru
-│   │   ├── nav3_local.kicad_sym
-│   │   ├── sym-lib-table
+│   ├── nav3/                    ← reference template (see STATUS.md, BOM.md)
+│   │   ├── nav3.kicad_pro       ← project settings — copy to new boards
+│   │   ├── nav3.kicad_sch       ← schematic (user-owned content)
+│   │   ├── nav3.kicad_pcb       ← layout (user-owned)
+│   │   ├── nav3.kicad_dru       ← design rules (JLCPCB tier) — copy
+│   │   ├── nav3_local.kicad_sym ← inlined symbols workaround — copy + rename
+│   │   ├── sym-lib-table        ← project-local lib registration — copy
 │   │   ├── BOM.md
 │   │   ├── STATUS.md
-│   │   ├── build_pcb_layout.py  ← deterministic PCB regeneration
-│   │   ├── fix_kicad9_compat.py
-│   │   ├── fix_pcb_nets.py
-│   │   ├── place_footprints.py
-│   │   └── pcb_sync_bypass.py
+│   │   ├── fix_kicad9_compat.py ← schematic-side workaround — copy
+│   │   ├── fix_pcb_nets.py      ← schematic-side workaround — copy
+│   │   └── pcb_sync_bypass.py   ← schematic-side workaround — copy
 │   ├── toggle3/                 ← TODO
 │   ├── illum3/                  ← TODO
 │   ├── encoder1/                ← TODO
@@ -475,20 +473,77 @@ When a board is finalised:
 
 ---
 
-## 9.5 Lessons learned from nav3 (read before starting the next board)
+## 9.5 Workflow split (AI ↔ user)
+
+Empirical result from the nav3 board: scripted PCB layout was a dead
+end (kicad-mcp-pro v2.4.x cannot reliably place + route on KiCad
+9.0.7 from a clean schematic). The pragmatic division of labour is:
+
+- **AI does**: schematic capture as a *starting template*, project
+  scaffolding, design-rule files, BOM draft, STEP export + STL
+  conversion + OpenSCAD case-fit verification.
+- **User does**: schematic review and rework (the AI's draft is a
+  starting point — pin assignments, decoupling, footprint choice, etc.
+  may all need adjustment), and **the PCB layout in full**: footprint
+  placement, routing, copper pours, silkscreen, mechanical keep-outs.
+  Done in the KiCad GUI, not via scripts.
+
+The AI hands off after `kicad-cli sch erc` is clean and a paper-tape
+of nets + footprints exists. The user picks up there, owns the board
+file from that point on, and emits a STEP when the layout is complete.
+The AI then takes the STEP back into the OpenSCAD case-fit check.
+
+## 9.6 Starting a new sub-PCB (template procedure)
+
+`pcb/nav3/` is the canonical template — it carries project settings,
+design rules, schematic-side workaround scripts, and an inlined symbol
+library that all transfer directly to other sub-PCBs. To bootstrap a
+new board (e.g. `toggle3`):
+
+```bash
+cd hardware/transmitter/pcb
+cp -r nav3 toggle3
+cd toggle3
+# Rename the project files
+for f in nav3.*; do mv "$f" "${f/nav3/toggle3}"; done
+mv nav3_local.kicad_sym toggle3_local.kicad_sym
+# Inside toggle3.kicad_pro / .kicad_sch / .kicad_pcb / sym-lib-table /
+# any of the .py scripts: substitute the string "nav3" → "toggle3"
+sed -i 's/nav3/toggle3/g' *.kicad_pro *.kicad_pcb sym-lib-table *.py
+# Rip out the nav3 schematic content (sheet contents, NOT the file
+# header) so you start from an empty schematic with the same project
+# settings, DRC rules, and symbol library
+# (best done in the KiCad GUI: open the schematic, select all, delete)
+# Drop the failed PCB layout scripts that didn't work for nav3 either
+rm build_pcb_layout.py place_footprints.py
+# Drop the gitignored junk so they don't carry over
+rm -rf nav3-backups output .kicad-mcp ~*.lck
+```
+
+Once the new project boots cleanly:
+
+1. AI generates the schematic from the brief (parts list + nets).
+2. Run `python3 fix_kicad9_compat.py` and `python3 fix_pcb_nets.py`
+   to apply the nav3-discovered workarounds.
+3. AI exports the schematic to PDF for user review.
+4. **Hand off to user.** User reviews/reworks the schematic and does
+   the entire PCB layout in the KiCad GUI.
+5. After user-side DRC passes, AI runs `kicad-cli pcb export step` →
+   `parts/<board>_actual.step` → `step_to_stl.py` → import into
+   `pcb_subpanel.scad`.
+6. Case-fit check via OpenSCAD assembly_check — tweak the
+   `<NAME>_STL_OFFSET` and the `layout_front.scad` shift until the
+   imported board's panel-side components line up with the case
+   cutouts.
+
+## 9.7 Gotchas inherited from nav3
 
 These bit us during nav3 and will bite again unless avoided:
 
-**KiCad / kicad-mcp-pro on KiCad 9.0.7 has known headless bugs.** The
-nav3 directory carries `fix_kicad9_compat.py`, `fix_pcb_nets.py`,
-`pcb_sync_bypass.py`, `place_footprints.py` as workaround scripts.
-Re-run them after every batch of MCP edits. For a small board, the
-pragmatic split is: **schematic + nets via scripts/MCP; placement +
-routing in the KiCad GUI; export + DRC via `kicad-cli`**.
-
 **Net mapping bug**: kicad-mcp-pro v2.4.x assigns every PCB pad to
 `+3V3` after schematic-derived sync. Always re-run `fix_pcb_nets.py`
-before checking the ratsnest.
+before checking the ratsnest. (Only relevant if any scripted PCB-side
+edits happen at all — for a fully GUI-driven layout, this never fires.)
 
 **Schematic file format**: kicad-mcp-pro emits KiCad-10 (date stamp
 20250316), KiCad 9.0.7 wants KiCad-9 (20240920). `fix_kicad9_compat.py`
@@ -506,7 +561,7 @@ OpenSCAD's CGAL backend (F6) rejects this as non-manifold and silently
 drops geometry. `step_to_stl.py` already handles this by FreeCAD-fusing
 all solids before tessellation, and `pcb_subpanel.scad` wraps the
 import in `render()` as belt-and-braces. **Keep both.** If you change
-the FreeCAD pipeline, run `admesh nav3_actual.stl` and confirm that
+the FreeCAD pipeline, run `admesh <board>_actual.stl` and confirm that
 "Number of parts" stays in the single digits — high counts mean the
 fuse failed.
 
@@ -516,11 +571,11 @@ fuse failed.
 new board appears mirrored after import, double-check the sign of
 the Y components in the offset.
 
-**Switch centroid != PCB centroid**: nav3's switches are 5 mm "north"
-of the PCB centre because the connector takes the bottom edge. The
-fix lives in `parts/layout_front.scad` (`translate([0, NAV_BTN_Y - 5,
-SUBPCB_Z_NAV])`). Each new sub-PCB will need its own offset measured
-once and hard-coded.
+**Switch / connector centroid != PCB centroid**: nav3's switches are
+5 mm "north" of the PCB centre because the connector takes the bottom
+edge. The fix lives in `parts/layout_front.scad` (`translate([0,
+NAV_BTN_Y - 5, SUBPCB_Z_NAV])`). Each new sub-PCB will need its own
+offset measured once and hard-coded.
 
 **Outline grew from estimate**: nav3 ended up at 32 × 30 mm vs the
 original 32 × 16 mm guess. The driver was the SOIC-16W IC body on
