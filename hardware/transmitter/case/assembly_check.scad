@@ -12,6 +12,7 @@ use <top_shell.scad>
 use <bottom_shell.scad>
 use <battery_cover.scad>
 use <battery_lid.scad>
+use <nav_button_cap.scad>
 use <../parts/battery.scad>
 use <../parts/usb_c_extension_cable.scad>
 use <../parts/layout_front.scad>
@@ -81,6 +82,11 @@ module assembly_full() {
     // All vitamins and sub-PCBs at their layout positions; suppress the
     // mock translucent panel because the real shell already provides it.
     transmitter_layout_front(show_mock_panel=false);
+
+    // Printed nav-button caps over the 3 tact switches.
+    for (sx = [-NAV_BTN_SPACING, 0, NAV_BTN_SPACING])
+        translate([sx, NAV_BTN_Y, 0])
+            nav_button_cap();
 }
 
 module assembly_check() {
