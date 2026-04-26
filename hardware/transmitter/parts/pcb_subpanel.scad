@@ -20,15 +20,15 @@ include <utils.scad>
 PCB_THICK         = 1.6;
 PCB_MOUNT_D       = 2.5;     // M2.5 clearance hole
 PCB_MOUNT_INSET   = 3;       // mount-hole inset from PCB edge
-PCB_JST_PIN_COUNT = 4;       // I2C: VCC + GND + SDA + SCL
-PCB_JST_HOUSING   = [10, 4, 5];  // JST-XH 4-pin housing (rough)
+PCB_JST_PIN_COUNT = 5;       // I2C: VCC + GND + SDA + SCL + INT (open-drain interrupt from PCF8574A)
+PCB_JST_HOUSING   = [14.6, 6.2, 7.6];  // JST-XH 5-pin (B5B-XH-A) housing approx W×D×H
 PCB_JST_INSET     = 2;       // distance from PCB edge to connector center
 
 // ----- Per-variant outlines -----
 TOGGLE_PCB_SIZE   = [60, 24];   // 3 toggles in a row at 18mm pitch + margin
 ILLUM_PCB_SIZE    = [60, 24];   // 3 illuminated buttons at 18mm pitch + margin
 ENCODER_PCB_SIZE  = [30, 22];   // 1 encoder + IC + JST per board
-NAV_PCB_SIZE      = [32, 16];   // 3 nav tacts at -10/0/+10
+NAV_PCB_SIZE      = [32, 30];   // 3 nav tacts at -10/0/+10. 30mm height accommodates SOIC-16W IC on B.Cu under the switch row plus 4× M2 mount holes at 3mm inset (verified against the actual nav3 PCB layout, 2026-04-26)
 
 // =============================================================================
 // Generic helper — draws a sub-PCB with mount holes and a JST connector.
@@ -71,8 +71,28 @@ module subpanel_pcb_encoder1(jst_edge="back") {
     _subpanel_pcb(ENCODER_PCB_SIZE, jst_edge);
 }
 
+// Use the actual KiCad-exported PCB STL when available (mirrors the real
+// board: traces, IC body, JST housing, logos in 3D). Falls back to the
+// parametric placeholder when the STL is missing or USE_REAL_PCB=false.
+USE_REAL_PCB = true;
+
+// Translation that aligns nav3_actual.stl's PCB-centroid-on-top-face to
+// the parametric origin. KiCad STEP exports use file coordinates with
+// Y negated (STEP Y-up vs KiCad screen Y-down). The nav3 board outline
+// is at file X=100..132, Y=100..130, so the STL spans X=100..132 and
+// Y=-130..-100 with PCB top face at z≈+0.8 (PCB_THICK/2 above z=0).
+NAV_STL_OFFSET = [-(100+132)/2, -(-130+-100)/2, -PCB_THICK/2];  // (-116, 115, -0.8)
+
 module subpanel_pcb_nav3(jst_edge="back") {
-    _subpanel_pcb(NAV_PCB_SIZE, jst_edge);
+    if (USE_REAL_PCB)
+        color(COLOR_PCB)
+            translate(NAV_STL_OFFSET)
+                // render() forces a local CGAL evaluation of the import so
+                // that F6 (CGAL) shows the PCB even when the STL has minor
+                // manifold issues. F5 falls back to OpenCSG preview anyway.
+                render(convexity=10) import("nav3_actual.stl", convexity=10);
+    else
+        _subpanel_pcb(NAV_PCB_SIZE, jst_edge);
 }
 
 // =============================================================================
