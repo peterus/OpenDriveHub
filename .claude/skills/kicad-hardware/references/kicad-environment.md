@@ -102,6 +102,82 @@ Invoked and confirmed working on 2026-08-07, KiCad 10.0.5 + kicad-mcp-pro
 Everything else in the 391-tool surface is known only from reading the package
 source. Confirm a tool is callable before building a procedure on it.
 
+## The two installations bite the symbol cache
+
+Measured 2026-08-07 while building `toggle3`.
+
+The MCP server runs **outside** the Flatpak, so it reads symbols from the
+Debian package at `/usr/share/kicad/symbols` — **KiCad 9**. `kicad-cli-10` runs
+inside the Flatpak and validates against
+`~/.local/share/flatpak/runtime/org.kicad.KiCad.Library.Symbols/.../symbols` —
+**KiCad 10**. Every symbol the server places therefore lands in the schematic as
+a KiCad 9 definition and ERC reports `lib_symbol_mismatch` against it.
+
+`Switch:SW_SPDT` diffed between the two: KiCad 10 adds `in_pos_files`,
+`duplicate_pin_numbers_are_jumpers`, `show_name` and `do_not_autoplace`, moves
+`hide` from inside `effects` up to the property, changes the empty Datasheet
+from `"~"` to `""`, and orders the pins differently. **Pin numbers, names and
+coordinates are identical** — the netlist is unaffected, so this is a metadata
+warning, not a wiring risk.
+
+Fix is GUI-side: *Tools → Update Symbols from Library*, which rewrites the
+cached definition from KiCad 10. Confirmed on `toggle3` — after the user ran it,
+the cached `SW_SPDT` carried the KiCad 10 markers (`show_name`,
+`do_not_autoplace`, `in_pos_files`, `duplicate_pin_numbers_are_jumpers`) and ERC
+went from 3 warnings to 0.
+
+Expect this on every symbol the server places from a system library, on every
+board.
+
+**Beware of attributing the fix to a tool call.** In this session the ERC
+warnings vanished between two agent tool calls and the cache turned out to
+already match KiCad 10 — which looked like a server-side write path silently
+re-serialising `lib_symbols`. It was not: the user had run the GUI fix in
+parallel. When a warning disappears without a matching action, establish who
+changed the file before writing down a mechanism.
+
+## Editing a schematic that is open in the GUI
+
+KiCad does **not** reload schematics from disk, and F5 in Eeschema is redraw,
+not reload. The MCP server's file-backed writes therefore stay invisible in a
+window that already has the file open, and a `Ctrl+S` from that window
+overwrites every server-side edit made since it was opened.
+
+Working sequence: make the server-side edits, then close the document
+**discarding changes**, then reopen. Confirm which document KiCad actually has
+open before starting — `~<name>.kicad_sch.lck` next to the project names it.
+
+## Tool defects seen while authoring toggle3 (2026-08-07)
+
+- **`sch_get_connectivity_graph` mis-groups nets.** Seen merging `+3V3`, `GND`
+  and `PWR_FLAG` into a single group, and separately reporting GND-tied address
+  pins as `~unnamed`. Both were wrong. Use
+  `kicad-cli sch export netlist` and read the `(nets ...)` block — that is
+  KiCad's own connectivity engine and it was correct both times.
+- **`sch_add_power_symbol` writes hash references** (`#PWRb9ee`) instead of the
+  sequential `#PWR0101` form. `kicad-cli` then reports "schematic has annotation
+  errors" on every export. **`sch_annotate` does not fix them** — it reported
+  "Annotated 12 symbol(s)" and changed nothing. Fix in the GUI: *Tools →
+  Annotate Schematic* with *Keep existing annotations*.
+- **`sch_add_label` defaults to a 1.52 mm font** while KiCad's own default sheet
+  text is 1.27 mm, so added labels look oversized next to existing ones.
+  `sch_normalize_text_sizes(apply=true)` pulls them onto the sheet's dominant
+  size and is connectivity-neutral.
+- **`sch_render_png` is unavailable** — it needs CairoSVG and Pillow, which this
+  install lacks. Render with `kicad-cli-10 sch export pdf` piped through
+  `pdftoppm -png -r 150 -cropbox`; `rsvg-convert`, `inkscape` and ImageMagick
+  are all absent, `pdftoppm` is present.
+- **`sch_cosmetic_score` misses reference-text-over-symbol collisions.** It
+  scored a sheet whose designators sat on top of their switch bodies without
+  flagging it; the defect was obvious in the render. Look at the image — the
+  score is a supplement, not a substitute. `sch_autoplace_fields` fixes it.
+- **All 48 `pcb_write` tools are unavailable** unless a PCB document is open in
+  KiCad; live PCB writes need KiCad 10 + an open board. The `routing` family
+  additionally needs `KICAD_MCP_OPERATING_MODE=experimental`, and the
+  manufacturing/release family needs `manufacturing`. `project_get_next_action`
+  will happily recommend `manufacturing_quality_gate()`, which is itself
+  unavailable in `write` mode.
+
 ## Known defects (measured on KiCad 10.0.5 + kicad-mcp-pro 3.30.1)
 
 **`sch_build_circuit` orphans child sheets.** It rebuilds one file — the active

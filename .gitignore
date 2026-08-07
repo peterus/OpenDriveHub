@@ -20,10 +20,13 @@ fp-info-cache
 # *.kicad_prl = per-user UI state (zoom, visible layers)
 # *-backups/ = KiCad auto-backup .zip archives
 # .history/ = KiCad 10 "Local History" snapshots — carries its own nested git repo
+# .kicad-mcp/ = kicad-mcp-pro scratch dir: visual-diff snapshots and baselines,
+#               written next to the project on schematic edits
 ~*.lck
 *.kicad_prl
 *-backups/
 .history/
+.kicad-mcp/
 
 # KiCad — regeneratable outputs inside PCB project directories.
 # Source of truth lives in the .kicad_sch / .kicad_pcb; everything below can
