@@ -13,6 +13,22 @@ You (the LLM) cannot see schematics or boards directly. This skill closes the ga
 
 ERC/DRC warnings are not optional decoration. Either fix them or explicitly tell the user which warning was suppressed and why.
 
+## Division of labour
+
+Settled empirically on the nav3 board, after scripted layout produced nothing
+usable:
+
+- **You (the agent) do**: schematic capture as a *starting draft*, project
+  scaffolding, design rules, the BOM draft, validation, STEP export and the
+  OpenSCAD case-fit check.
+- **The user does**: schematic review and rework — your draft is a starting
+  point, not a proposal to defend — and **the entire PCB layout**: placement,
+  routing, pours, silkscreen, keep-outs, in the GUI.
+
+Hand off when ERC is clean and a net-and-footprint list exists. From that point
+the board file belongs to the user. Do not place or route footprints unless
+asked directly.
+
 ## When triggered
 
 - Any edit to `*.kicad_sch`, `*.kicad_pcb`, `*.kicad_pro`, `*.kicad_sym`, `*.kicad_mod`, `sym-lib-table`, `fp-lib-table`
@@ -68,15 +84,32 @@ Failing any step → fix before continuing. Skipping any step → not done.
 
 ## Workflow (greenfield PCB)
 
-1. **Read the design brief.** For OpenDriveHub, `hardware/transmitter/PCB_DESIGN_BRIEF.md` is canonical for the transmitter side. Cross-check pin counts, voltages, mechanical envelope.
-2. **Lock the BOM first.** Before drawing a single wire, list every part with manufacturer part number. For each part decide: standard KiCad library? SnapEDA/Ultra Librarian? Manufacturer-provided? Hand-rolled (last resort)? Document the choice in a `BOM.md` next to the project.
-3. **Set up the project skeleton** — `<board>.kicad_pro`, blank `.kicad_sch`, blank `.kicad_pcb`. Use kicad-mcp-pro's project-create tool, not by copying.
-4. **Schematic** — components, then wires, then power flags, then labels/nets. Run ERC after each major chunk, not only at the end.
-5. **Footprint assignment** — every symbol gets a footprint. Verify pad-count and pin-mapping for ICs against the datasheet, not just the symbol's pin numbers. Wrong footprint = dead board.
-6. **PCB outline** — set board edge first. For OpenDriveHub sub-PCBs the outline is constrained by the case cutouts in `hardware/transmitter/parts/layout_front.scad` — measure there, do not guess.
-7. **Place** — connectors and mechanically-constrained parts first (where they have to be), then ICs, then passives. Decoupling caps next to their IC pins, not "somewhere on the rail".
-8. **Route** — power and ground first (or pour ground), then high-speed signals, then the rest. For I²C-only sub-PCBs (nav3, encoder1, etc.) routing is trivial; for the main board it is the bulk of the work.
-9. **DRC + render gate** — see above. Then export gerbers + drill + position file + STEP for the case-fit check.
+1. **Read the design brief.** `hardware/transmitter/PCB_DESIGN_BRIEF.md` is
+   canonical for the transmitter. Cross-check pin counts, voltages and the
+   mechanical envelope.
+2. **Lock the BOM first.** Every part with a manufacturer part number, and for
+   each one a decision: standard KiCad library, SnapEDA or similar,
+   manufacturer-provided, or hand-rolled as a last resort. Record it in a
+   `BOM.md` next to the project. No wires before this exists.
+3. **Scaffold the project**, then set the design intent before schematic work.
+4. **Place before connecting.** Ask `sch_find_free_placement` for coordinates
+   rather than guessing them, and add power symbols before the circuits that
+   depend on them.
+5. **Connect by name, not by geometry.** Prefer a short pin stub plus a
+   same-named label over drawn wires between pins. Wires that cross unrelated
+   pins get merged by KiCad on geometry, which produces silent shorts that no
+   amount of visual inspection reliably catches. Where a tool offers a routed
+   alternative it usually says so in its own documentation — believe the
+   warning. Add junctions afterwards.
+6. **Validate in this order**: power flags, ERC, then the schematic design-rule
+   check, which reports missing decoupling, absent I²C pull-ups and crystal
+   load capacitors that ERC will not.
+7. **Then make it readable.** Cosmetic quality is measurable — score it, fix,
+   re-measure. Overlapping reference designators are the usual first offender.
+8. **PCB outline** — set board edge first. For OpenDriveHub sub-PCBs the outline is constrained by the case cutouts in `hardware/transmitter/parts/layout_front.scad` — measure there, do not guess.
+9. **Place** — connectors and mechanically-constrained parts first (where they have to be), then ICs, then passives. Decoupling caps next to their IC pins, not "somewhere on the rail".
+10. **Route** — power and ground first (or pour ground), then high-speed signals, then the rest. For I²C-only sub-PCBs (nav3, encoder1, etc.) routing is trivial; for the main board it is the bulk of the work.
+11. **DRC + render gate** — see above. Then export gerbers + drill + position file + STEP for the case-fit check.
 
 ## Workflow (modify existing PCB)
 
