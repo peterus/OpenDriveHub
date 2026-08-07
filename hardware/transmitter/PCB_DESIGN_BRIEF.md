@@ -438,18 +438,14 @@ hardware/transmitter/
 │   ├── nav_button_cap.scad
 │   └── assembly_check.scad
 ├── pcb/                         ← KiCad projects, one folder per board
-│   ├── nav3/                    ← reference template (see STATUS.md, BOM.md)
-│   │   ├── nav3.kicad_pro       ← project settings — copy to new boards
+│   ├── nav3/                    ← reference template (see BOM.md)
+│   │   ├── nav3.kicad_pro       ← project + board settings — copy to new boards
 │   │   ├── nav3.kicad_sch       ← schematic (user-owned content)
 │   │   ├── nav3.kicad_pcb       ← layout (user-owned)
-│   │   ├── nav3.kicad_dru       ← design rules (JLCPCB tier) — copy
-│   │   ├── nav3_local.kicad_sym ← inlined symbols workaround — copy + rename
+│   │   ├── nav3_local.kicad_sym ← flattened symbols — copy + rename
 │   │   ├── sym-lib-table        ← project-local lib registration — copy
-│   │   ├── BOM.md
-│   │   ├── STATUS.md
-│   │   ├── fix_kicad9_compat.py ← schematic-side workaround — copy
-│   │   ├── fix_pcb_nets.py      ← schematic-side workaround — copy
-│   │   └── pcb_sync_bypass.py   ← schematic-side workaround — copy
+│   │   └── BOM.md
+│   ├── test/                    ← schematic sandbox for the remaining types
 │   ├── toggle3/                 ← TODO
 │   ├── illum3/                  ← TODO
 │   ├── encoder1/                ← TODO
@@ -495,10 +491,9 @@ The AI then takes the STEP back into the OpenSCAD case-fit check.
 
 ## 9.6 Starting a new sub-PCB (template procedure)
 
-`pcb/nav3/` is the canonical template — it carries project settings,
-design rules, schematic-side workaround scripts, and an inlined symbol
-library that all transfer directly to other sub-PCBs. To bootstrap a
-new board (e.g. `toggle3`):
+`pcb/nav3/` is the canonical template — it carries the project and
+board settings plus a flattened symbol library that transfer directly
+to other sub-PCBs. To bootstrap a new board (e.g. `toggle3`):
 
 ```bash
 cd hardware/transmitter/pcb
@@ -507,24 +502,22 @@ cd toggle3
 # Rename the project files
 for f in nav3.*; do mv "$f" "${f/nav3/toggle3}"; done
 mv nav3_local.kicad_sym toggle3_local.kicad_sym
-# Inside toggle3.kicad_pro / .kicad_sch / .kicad_pcb / sym-lib-table /
-# any of the .py scripts: substitute the string "nav3" → "toggle3"
-sed -i 's/nav3/toggle3/g' *.kicad_pro *.kicad_pcb sym-lib-table *.py
+# Substitute the string "nav3" → "toggle3" inside the project files
+sed -i 's/nav3/toggle3/g' *.kicad_pro *.kicad_pcb sym-lib-table
 # Rip out the nav3 schematic content (sheet contents, NOT the file
 # header) so you start from an empty schematic with the same project
 # settings, DRC rules, and symbol library
 # (best done in the KiCad GUI: open the schematic, select all, delete)
-# Drop the failed PCB layout scripts that didn't work for nav3 either
-rm build_pcb_layout.py place_footprints.py
-# Drop the gitignored junk so they don't carry over
-rm -rf nav3-backups output .kicad-mcp ~*.lck
+# Drop the gitignored junk so it doesn't carry over
+rm -rf nav3-backups output ~*.lck
 ```
 
 Once the new project boots cleanly:
 
 1. AI generates the schematic from the brief (parts list + nets).
-2. Run `python3 fix_kicad9_compat.py` and `python3 fix_pcb_nets.py`
-   to apply the nav3-discovered workarounds.
+2. Confirm KiCad can actually load the result — `kicad-cli sch erc`
+   must not report "Failed to load schematic". If it does, see the
+   file-format and `extends`-symbol gotchas in §9.7.
 3. AI exports the schematic to PDF for user review.
 4. **Hand off to user.** User reviews/reworks the schematic and does
    the entire PCB layout in the KiCad GUI.
@@ -541,15 +534,23 @@ Once the new project boots cleanly:
 These bit us during nav3 and will bite again unless avoided:
 
 **Net mapping bug**: kicad-mcp-pro v2.4.x assigns every PCB pad to
-`+3V3` after schematic-derived sync. Always re-run `fix_pcb_nets.py`
-before checking the ratsnest. (Only relevant if any scripted PCB-side
-edits happen at all — for a fully GUI-driven layout, this never fires.)
+`+3V3` after a schematic-derived sync. Inspect the ratsnest before
+trusting any scripted sync. This never fires for a fully GUI-driven
+layout, which is the workflow §9.5 settles on.
 
 **Schematic file format**: kicad-mcp-pro emits KiCad-10 (date stamp
-20250316), KiCad 9.0.7 wants KiCad-9 (20240920). `fix_kicad9_compat.py`
-downgrades the format and inlines `extends`-based symbols (KiCad 9
-can't load PCF8574AT-extends-PCF8574; the script flattens it into a
-standalone symbol in `<board>_local.kicad_sym`).
+20250316), KiCad 9.0.7 wants KiCad-9 (20240920), and it writes
+`extends`-based symbols that KiCad 9 cannot load at all (PCF8574AT
+extends PCF8574 → "Failed to load schematic"). The fix on nav3 was to
+downgrade the version field and flatten the symbol into a standalone
+copy in `<board>_local.kicad_sym`, which is why that library exists.
+
+The scripts that performed both of these fixes have been deleted. They
+had drifted to stale board dimensions (32 × 24 mm) and the pre-rework
+I²C address (0x3F instead of 0x38), so re-running them would have
+corrupted the finished layout. If the MCP path is picked up again,
+write fresh ones against the board at hand — do not restore them from
+git history.
 
 **Reference designators must NOT start with `#`** (MCP skips those
 when syncing footprints). Non-electrical decorations like OSHW logos
