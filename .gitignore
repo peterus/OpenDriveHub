@@ -51,3 +51,7 @@ renders/
 # unless intentionally checked in case-by-case)
 *.stl
 *.3mf
+
+# Local MCP server configuration — machine-specific paths.
+# Copy .mcp.json.example and fill in the placeholders.
+.mcp.json
