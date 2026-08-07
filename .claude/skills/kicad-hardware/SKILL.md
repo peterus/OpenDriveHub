@@ -106,10 +106,11 @@ Failing any step → fix before continuing. Skipping any step → not done.
    load capacitors that ERC will not.
 7. **Then make it readable.** Cosmetic quality is measurable — score it, fix,
    re-measure. Overlapping reference designators are the usual first offender.
-8. **PCB outline** — set board edge first. For OpenDriveHub sub-PCBs the outline is constrained by the case cutouts in `hardware/transmitter/parts/layout_front.scad` — measure there, do not guess.
-9. **Place** — connectors and mechanically-constrained parts first (where they have to be), then ICs, then passives. Decoupling caps next to their IC pins, not "somewhere on the rail".
-10. **Route** — power and ground first (or pour ground), then high-speed signals, then the rest. For I²C-only sub-PCBs (nav3, encoder1, etc.) routing is trivial; for the main board it is the bulk of the work.
-11. **DRC + render gate** — see above. Then export gerbers + drill + position file + STEP for the case-fit check.
+8. **Footprint assignment** — every symbol gets a footprint. Verify pad-count and pin-mapping for ICs against the datasheet, not just the symbol's pin numbers. Wrong footprint = dead board.
+9. **PCB outline** — set board edge first. For OpenDriveHub sub-PCBs the outline is constrained by the case cutouts in `hardware/transmitter/parts/layout_front.scad` — measure there, do not guess.
+10. **Place** — connectors and mechanically-constrained parts first (where they have to be), then ICs, then passives. Decoupling caps next to their IC pins, not "somewhere on the rail".
+11. **Route** — power and ground first (or pour ground), then high-speed signals, then the rest. For I²C-only sub-PCBs (nav3, encoder1, etc.) routing is trivial; for the main board it is the bulk of the work.
+12. **DRC + render gate** — see above. Then export gerbers + drill + position file + STEP for the case-fit check.
 
 ## Workflow (modify existing PCB)
 
