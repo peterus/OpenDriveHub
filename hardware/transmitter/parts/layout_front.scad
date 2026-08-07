@@ -160,7 +160,11 @@ module transmitter_layout_front(show_mock_panel=true) {
             subpanel_pcb_encoder1();
         translate([ENCODER_RIGHT_POS.x, ENCODER_RIGHT_POS.y, SUBPCB_Z_ENCODER])
             subpanel_pcb_encoder1();
-        translate([0, NAV_BTN_Y, SUBPCB_Z_NAV])
+        // The actual KiCad layout places the switch row 5mm "north" of the PCB
+        // centroid (PCB-local Y=-5 in KiCad screen coords, which becomes +5
+        // after the STEP export negates Y). To align the switch caps with the
+        // panel cutouts at NAV_BTN_Y, place the PCB centroid 5mm "south".
+        translate([0, NAV_BTN_Y - 5, SUBPCB_Z_NAV])
             subpanel_pcb_nav3();
 
         // Main PCB behind the display (display plugs directly into its header)
