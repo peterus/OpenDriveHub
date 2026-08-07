@@ -1,6 +1,6 @@
 ---
 name: kicad-hardware
-description: Use when editing .kicad_sch / .kicad_pcb / .kicad_pro files or designing PCBs in hardware/*/pcb/. Mandates KiCad standard libraries first, MCP-or-CLI editing (never hand-edit S-expressions), and a non-negotiable ERC + DRC + visual render-check after every change before declaring work done.
+description: Use when editing .kicad_sch / .kicad_pcb / .kicad_pro files or designing PCBs in hardware/*/pcb/.
 ---
 
 # kicad-hardware
