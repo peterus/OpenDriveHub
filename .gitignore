@@ -19,9 +19,11 @@ fp-info-cache
 # ~*.lck = open-document lock markers
 # *.kicad_prl = per-user UI state (zoom, visible layers)
 # *-backups/ = KiCad auto-backup .zip archives
+# .history/ = KiCad 10 "Local History" snapshots — carries its own nested git repo
 ~*.lck
 *.kicad_prl
 *-backups/
+.history/
 
 # KiCad — regeneratable outputs inside PCB project directories.
 # Source of truth lives in the .kicad_sch / .kicad_pcb; everything below can
