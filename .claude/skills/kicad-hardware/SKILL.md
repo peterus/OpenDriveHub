@@ -87,7 +87,7 @@ Failing any step → fix before continuing. Skipping any step → not done.
 
 ## Library policy (in this order)
 
-1. **KiCad standard libraries** (`/usr/share/kicad/symbols`, `/usr/share/kicad/footprints`) — 225 symbol libs, 146 footprint libs already installed. Covers passives, common ICs (74xx, CD4xxx, common MCUs, common interfaces), connectors, switches, the mechanical library. **Always check here first.**
+1. **KiCad's bundled standard libraries.** Covers passives, common ICs (74xx, CD4xxx, common MCUs, common interfaces), connectors, switches, the mechanical library. **Always check here first.**
 2. **SnapEDA / Ultra Librarian / Component Search Engine** — for parts not in standard libs (IP5389, FT6236, ST7796 FPC connectors, etc.). Download as KiCad-format symbol+footprint+3D, drop into a project-local library, never into the system libs.
 3. **Manufacturer-provided KiCad libraries** — some chip vendors (Espressif, ST, TI sometimes) ship official KiCad libs. Prefer these over SnapEDA when available.
 4. **Hand-rolled symbol/footprint** — only if the part is genuinely not on the internet. Cross-check pad coordinates against the datasheet *millimeter by millimeter* before trusting it.
@@ -187,9 +187,3 @@ Use `step_to_stl.py`, not a plain STEP→STL converter. It fuses the solids KiCa
 Two alignment traps live in this loop — KiCad's screen-Y is inverted relative to STEP/STL Y, and a board's component centroid is generally not its PCB centroid. Both are documented with their fixes in `PCB_DESIGN_BRIEF.md` §9.7. Read that before hand-tuning any offset.
 
 The case is the source of truth for outer dimensions; the PCB has to comply.
-
-## MCP setup note
-
-The kicad-mcp-pro server is configured in `.mcp.json` (project-local). After adding it, **Claude Code must be restarted** before the new MCP tools are visible. The first run pulls the package via `uvx` (~30 s).
-
-**Profile choice**: use `KICAD_MCP_PROFILE=agent_full`. The `minimal` profile only exposes read/export/setup tools — no `sch_add_*`, no `pcb_*` editing, no `lib_search_*`. `agent_full` exposes the full editing surface needed to actually build a PCB. Switching profiles requires editing `.mcp.json` and restarting Claude Code.
