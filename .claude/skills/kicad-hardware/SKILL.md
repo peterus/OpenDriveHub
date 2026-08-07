@@ -5,7 +5,7 @@ description: Use when editing .kicad_sch / .kicad_pcb / .kicad_pro files or desi
 
 # kicad-hardware
 
-You (the LLM) cannot see schematics or boards directly. This skill closes the gap with three things: a strict no-hand-editing rule for KiCad files, a mandatory validate-and-look workflow after every change, and a library hierarchy that keeps you out of footprint-hell.
+You (the LLM) cannot see schematics or boards directly. This skill closes the gap: a strict no-hand-editing rule for KiCad files, a mandatory validate-and-look workflow after every change, and a library hierarchy that keeps you out of footprint-hell, among the guidance below.
 
 ## The prime directive
 
@@ -43,7 +43,7 @@ things off it:
 1. **CLI version against IPC version.** If they differ, exports and live edits
    are addressing different KiCad releases and results will not agree. Fix that
    before continuing.
-2. **Whether IPC is connected.** It gates roughly a third of the schematic
+2. **Whether IPC is connected.** It gates a large share of the schematic
    tools, and the gate is applied when the MCP server starts — not when you
    first call a tool.
 3. **Whether a document is open**, if you intend to use anything live.

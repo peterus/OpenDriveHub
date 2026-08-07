@@ -471,6 +471,12 @@ When a board is finalised:
 
 ## 9.5 Workflow split (AI ↔ user)
 
+> **Historical, 2026-08-07:** the tool-version claim below was recorded
+> against kicad-mcp-pro v2.4.x and KiCad 9.0.7, both since superseded (see
+> `.claude/skills/kicad-hardware/references/kicad-environment.md` for
+> current versions). The scripted-layout-is-a-dead-end *conclusion* is not
+> retested here; the division of labour it motivated still stands.
+
 Empirical result from the nav3 board: scripted PCB layout was a dead
 end (kicad-mcp-pro v2.4.x cannot reliably place + route on KiCad
 9.0.7 from a clean schematic). The pragmatic division of labour is:
@@ -530,6 +536,13 @@ Once the new project boots cleanly:
    cutouts.
 
 ## 9.7 Gotchas inherited from nav3
+
+> **Historical, 2026-08-07:** the entries below were recorded against
+> kicad-mcp-pro v2.4.x and KiCad 9.0.7, both since superseded (see
+> `.claude/skills/kicad-hardware/references/kicad-environment.md` for
+> current versions). Re-tested on 2026-08-07: the `extends`-symbol failure
+> and the file-format load failure no longer reproduce. Kept as history —
+> confirm current behaviour before relying on it.
 
 These bit us during nav3 and will bite again unless avoided:
 

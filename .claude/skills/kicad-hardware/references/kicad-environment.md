@@ -40,6 +40,14 @@ Installed at `~/.local/bin/kicad-cli-10`, and the MCP server is pointed at it
 via `KICAD_MCP_KICAD_CLI`. Without this the server reaches KiCad 10 over IPC
 while running every export, ERC and DRC through the 9.0.8 CLI.
 
+The wrapper governs the shell as well as the server — it is not something the
+MCP configuration alone takes care of. A bare `kicad-cli` typed at a shell
+prompt reaches `/usr/bin/kicad-cli`, the 9.0.8 escape hatch, regardless of
+what the server is doing. When validating work done through the server
+(edits made via the `sch_*`/`pcb_*` MCP tools), run `kicad-cli-10` instead —
+`kicad_get_version()` cannot catch this mismatch because it reports the
+server's CLI, not the shell's.
+
 ### The sandbox boundary
 
 The Flatpak declares `filesystems=home;/media;/run/media`. **Anything under
@@ -94,7 +102,7 @@ Invoked and confirmed working on 2026-08-07, KiCad 10.0.5 + kicad-mcp-pro
 Everything else in the 391-tool surface is known only from reading the package
 source. Confirm a tool is callable before building a procedure on it.
 
-## Known defects
+## Known defects (measured on KiCad 10.0.5 + kicad-mcp-pro 3.30.1)
 
 **`sch_build_circuit` orphans child sheets.** It rebuilds one file — the active
 schematic — from scratch with a fresh root UUID and a flat
