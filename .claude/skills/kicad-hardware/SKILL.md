@@ -107,10 +107,17 @@ Failing any step → fix before continuing. Skipping any step → not done.
 7. **Then make it readable.** Cosmetic quality is measurable — score it, fix,
    re-measure. Overlapping reference designators are the usual first offender.
 8. **Footprint assignment** — every symbol gets a footprint. Verify pad-count and pin-mapping for ICs against the datasheet, not just the symbol's pin numbers. Wrong footprint = dead board.
-9. **PCB outline** — set board edge first. For OpenDriveHub sub-PCBs the outline is constrained by the case cutouts in `hardware/transmitter/parts/layout_front.scad` — measure there, do not guess.
-10. **Place** — connectors and mechanically-constrained parts first (where they have to be), then ICs, then passives. Decoupling caps next to their IC pins, not "somewhere on the rail".
-11. **Route** — power and ground first (or pour ground), then high-speed signals, then the rest. For I²C-only sub-PCBs (nav3, encoder1, etc.) routing is trivial; for the main board it is the bulk of the work.
-12. **DRC + render gate** — see above. Then export gerbers + drill + position file + STEP for the case-fit check.
+
+**Ownership changes here.** ERC is clean and a net-and-footprint list exists —
+the hand-off condition from Division of labour. Steps 9-12 below describe
+what happens to the board next, not what you do next: they belong to the
+user, in the GUI. Read them for context; do not execute them unless asked
+directly.
+
+9. **PCB outline** (user) — set board edge first. For OpenDriveHub sub-PCBs the outline is constrained by the case cutouts in `hardware/transmitter/parts/layout_front.scad` — measure there, do not guess.
+10. **Place** (user) — connectors and mechanically-constrained parts first (where they have to be), then ICs, then passives. Decoupling caps next to their IC pins, not "somewhere on the rail".
+11. **Route** (user) — power and ground first (or pour ground), then high-speed signals, then the rest. For I²C-only sub-PCBs (nav3, encoder1, etc.) routing is trivial; for the main board it is the bulk of the work.
+12. **DRC + render gate** (user runs layout to this point; you re-enter for validation) — see above. Then export gerbers + drill + position file + STEP for the case-fit check.
 
 ## Workflow (modify existing PCB)
 
