@@ -1,0 +1,4 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "toggle3_local")(type "KiCad")(uri "${KIPRJMOD}/toggle3_local.kicad_sym")(options "")(descr "Project-local symbols for toggle3"))
+)
