@@ -1,0 +1,258 @@
+(kicad_sch
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "76974d0b-a0b3-4cc4-8298-143e20ce9df0")
+	(paper "A4")
+	(lib_symbols)
+	(sheet
+		(at 114.3 152.4)
+		(size 17.78 12.7)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "284803bb-50e7-4da3-9c93-e7c69332b824")
+		(property "Sheetname" "Buttons x3 right"
+			(at 114.3 151.6884 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "buttons.kicad_sch"
+			(at 114.3 165.6846 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "I2C_SCL" input
+			(at 132.08 156.21 0)
+			(uuid "f87c4c56-9ca1-47d0-969c-736554d523f6")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "I2C_SDA" input
+			(at 132.08 158.75 0)
+			(uuid "8d87660a-eb38-4f56-81ab-76c906798943")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "IO_INT" input
+			(at 132.08 161.29 0)
+			(uuid "7eae97c1-7cb4-48ce-a918-7ffc74c4dd34")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(instances
+			(project "test"
+				(path "/76974d0b-a0b3-4cc4-8298-143e20ce9df0"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 35.56 104.14)
+		(size 20.32 13.97)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "48381f77-f010-4010-852a-3c63db8ae5e5")
+		(property "Sheetname" "Switches x3 left"
+			(at 35.56 103.4284 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "switches.kicad_sch"
+			(at 35.56 118.6946 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "test"
+				(path "/76974d0b-a0b3-4cc4-8298-143e20ce9df0"
+					(page "5")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 38.1 128.27)
+		(size 19.05 11.43)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "8617ba73-11fe-4a81-891e-d1eb47708db1")
+		(property "Sheetname" "Potentiometer x1"
+			(at 38.1 127.5584 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "pot.kicad_sch"
+			(at 38.1 140.2846 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "test"
+				(path "/76974d0b-a0b3-4cc4-8298-143e20ce9df0"
+					(page "4")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 38.1 152.4)
+		(size 17.78 12.7)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "8a22955f-4cbd-4285-87c2-9aaffbaadb9f")
+		(property "Sheetname" "Buttons x3 left"
+			(at 38.1 151.6884 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "buttons.kicad_sch"
+			(at 38.1 165.6846 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "I2C_SCL" input
+			(at 55.88 156.21 0)
+			(uuid "afde6228-ce20-4e41-87ea-731d4fc299a9")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "I2C_SDA" input
+			(at 55.88 158.75 0)
+			(uuid "6a76e386-4d7c-46a4-8ca0-c9b795c535f9")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "IO_INT" input
+			(at 55.88 161.29 0)
+			(uuid "335c939a-3bd4-4eb0-b0d8-6d3b2b079c1a")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(instances
+			(project "test"
+				(path "/76974d0b-a0b3-4cc4-8298-143e20ce9df0"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)

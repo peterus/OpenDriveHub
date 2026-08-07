@@ -1,0 +1,113 @@
+// Assembly check: render top shell + all front-panel components + sub-PCBs
+// together to visually verify every cutout aligns with its component.
+//
+// Use this view as a regression check when adjusting layout positions or
+// case dimensions. If a component clips into the shell wall (no cutout
+// where it should be), it's immediately visible.
+
+include <BOSL2/std.scad>
+include <parameters.scad>
+
+use <top_shell.scad>
+use <bottom_shell.scad>
+use <battery_cover.scad>
+use <battery_lid.scad>
+use <nav_button_cap.scad>
+use <../parts/battery.scad>
+use <../parts/usb_c_extension_cable.scad>
+use <../parts/layout_front.scad>
+
+// SHELL_XRAY: when true, render the shell as a translucent background (lets
+// you see PCBs and below-panel component bodies for cutout verification).
+// When false, render solid — only above-panel features (lever balls,
+// encoder shafts, illuminated caps, etc.) remain visible.
+SHELL_XRAY = false;
+
+// SECTION: cuts the assembly through the centre so the interior is
+// visible. "x" removes the +X half (look at the cut from +X), "y"
+// removes the +Y half (look at the cut from +Y), "none" leaves the
+// assembly intact. Set via -D SECTION='"x"' on the command line.
+SECTION = "none";
+
+module assembly_full() {
+    // Top shell at world Z (panel-mating face at z=0, panel face at z=PANEL_T).
+    if (SHELL_XRAY)
+        %color(COLOR_PRINTED) top_shell();
+    else
+        color(COLOR_PRINTED) top_shell();
+
+    // Bottom shell, translated so its mating face joins the top-shell back rim.
+    translate([0, 0, PANEL_T - TOP_DEPTH]) {
+        if (SHELL_XRAY)
+            %color(COLOR_PRINTED) bottom_shell();
+        else
+            color(COLOR_PRINTED) bottom_shell();
+    }
+
+    // Battery cover seated against the recess shoulder. Its outer face sits
+    // BATT_COVER_Z_GAP below the panel exterior — the visible step is the
+    // print-tolerance gap, not a geometry mismatch.
+    translate([BATT_POS_X, BATT_POS_Y,
+               PANEL_T - TOP_DEPTH - BOTTOM_DEPTH
+                   + BATT_COVER_RECESS + BATT_COVER_Z_GAP
+                   - BATT_COVER_T/2])
+        battery_cover();
+
+    // Battery interior lid — sits at the top of the corner bosses.
+    // Boss top in world Z = PANEL_T - TOP_DEPTH - BOTTOM_DEPTH + PANEL_T + BATT_BOSS_HEIGHT
+    translate([BATT_POS_X, BATT_POS_Y,
+               PANEL_T - TOP_DEPTH - BOTTOM_DEPTH + PANEL_T
+                   + BATT_BOSS_HEIGHT + BATT_LID_T/2])
+        battery_lid();
+
+    // LiPo cell sitting on the back-panel-interior, centred in its slot.
+    // Wires hidden — they're flexible and routed wherever needed.
+    translate([BATT_POS_X, BATT_POS_Y,
+               PANEL_T - TOP_DEPTH - BOTTOM_DEPTH + PANEL_T])
+        lipo_2s_2000mah(anchor=BOTTOM, show_wires=false);
+
+    // USB-C extension-cable female panel mount — flange sits flush
+    // against the INNER face of the -Y wall (inside the case). Screws
+    // come from outside through wall clearance holes and thread into
+    // the adapter's built-in M2 nuts.
+    // Inner-wall Y at z=USBC_POS_Z; housing depth is 5mm.
+    let(taper = (USBC_POS_Z + BOTTOM_DEPTH - PANEL_T) / (BOTTOM_DEPTH - PANEL_T),
+        inner_y = -((CASE_H - 2*TAPER_Y + 2*TAPER_Y * taper) / 2 - WALL_T),
+        housing_depth = 5)
+    translate([USBC_POS_X,
+               inner_y + housing_depth/2,
+               USBC_POS_Z + (PANEL_T - TOP_DEPTH)])
+        usb_c_extension_panel(anchor=CENTER);
+
+    // All vitamins and sub-PCBs at their layout positions; suppress the
+    // mock translucent panel because the real shell already provides it.
+    transmitter_layout_front(show_mock_panel=false);
+
+    // Printed nav-button caps over the 3 tact switches.
+    for (sx = [-NAV_BTN_SPACING, 0, NAV_BTN_SPACING])
+        translate([sx, NAV_BTN_Y, 0])
+            nav_button_cap();
+}
+
+module assembly_check() {
+    if (SECTION == "none") {
+        assembly_full();
+    } else {
+        // Big cuboid covers one half of the case; subtracting it slices the
+        // assembly through the centre so the interior is exposed.
+        difference() {
+            assembly_full();
+            if (SECTION == "x")
+                translate([0, 0, 0]) cuboid([400, 400, 400], anchor=LEFT);
+            else if (SECTION == "y")
+                translate([0, 0, 0]) cuboid([400, 400, 400], anchor=FRONT);
+        }
+    }
+}
+
+// =============================================================================
+// Standalone preview
+// =============================================================================
+SHOW_STANDALONE = true;
+
+if (SHOW_STANDALONE) assembly_check();

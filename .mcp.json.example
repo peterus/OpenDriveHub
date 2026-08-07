@@ -1,0 +1,50 @@
+{
+  "_comment": [
+    "Template for .mcp.json — copy to .mcp.json and replace the <...> placeholders.",
+    "The real file is gitignored because every path below is machine-specific.",
+    "",
+    "KICAD_MCP_PROFILE and KICAD_MCP_OPERATING_MODE are two independent axes:",
+    "the profile decides which tools exist (agent_full = 391, build = 24), the",
+    "operating mode decides whether they may write. Setting only one of them is",
+    "the most common way to end up without any schematic tools.",
+    "",
+    "KICAD_MCP_KICAD_CLI is only needed when kicad-cli does not come from the",
+    "system package — e.g. when KiCad runs as a Flatpak. In that case create a",
+    "wrapper and point this at it:",
+    "",
+    "  #!/bin/sh",
+    "  exec flatpak run --command=kicad-cli org.kicad.KiCad \"$@\"",
+    "",
+    "Without it the server talks to one KiCad release over IPC while running",
+    "every export, ERC and DRC through another. Check with kicad_get_version():",
+    "the reported CLI version and IPC version must match.",
+    "",
+    "The IPC socket needs no configuration — the KiCad Python API finds both the",
+    "native and the Flatpak socket on its own, and KiCad 10 enables its API",
+    "server by default. Note that a Flatpak KiCad only sees $HOME, /media and",
+    "/run/media, so project files must not live under /tmp."
+  ],
+  "mcpServers": {
+    "openscad": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--with",
+        "git+https://github.com/quellant/openscad-mcp.git",
+        "openscad-mcp"
+      ]
+    },
+    "kicad": {
+      "command": "uvx",
+      "args": [
+        "kicad-mcp-pro"
+      ],
+      "env": {
+        "KICAD_MCP_PROJECT_DIR": "<absolute path to this repository>",
+        "KICAD_MCP_PROFILE": "agent_full",
+        "KICAD_MCP_OPERATING_MODE": "write",
+        "KICAD_MCP_KICAD_CLI": "<absolute path to kicad-cli, omit if the system one is correct>"
+      }
+    }
+  }
+}

@@ -15,5 +15,43 @@
 *.000
 fp-info-cache
 
+# KiCad — transient / per-user files
+# ~*.lck = open-document lock markers
+# *.kicad_prl = per-user UI state (zoom, visible layers)
+# *-backups/ = KiCad auto-backup .zip archives
+# .history/ = KiCad 10 "Local History" snapshots — carries its own nested git repo
+~*.lck
+*.kicad_prl
+*-backups/
+.history/
+
+# KiCad — regeneratable outputs inside PCB project directories.
+# Source of truth lives in the .kicad_sch / .kicad_pcb; everything below can
+# be regenerated via `kicad-cli sch erc/export ...` or `kicad-cli pcb drc/render/export ...`.
+# (The canonical STEP for case-fit verification lives in
+#  hardware/transmitter/parts/<board>_actual.step and is intentionally NOT under pcb/.)
+hardware/**/pcb/**/output/
+hardware/**/pcb/**/fab/
+hardware/**/pcb/**/drc.json
+hardware/**/pcb/**/drc.txt
+hardware/**/pcb/**/erc.json
+hardware/**/pcb/**/erc.txt
+hardware/**/pcb/**/*.png
+hardware/**/pcb/**/*.svg
+hardware/**/pcb/**/*.pdf
+hardware/**/pcb/**/*.step
+
 # Python bytecode
 __pycache__
+
+# OpenSCAD render output (regenerable via openscad-mcp render_perspectives)
+renders/
+
+# Generated 3D-print artifacts (exported from .scad files; not tracked
+# unless intentionally checked in case-by-case)
+*.stl
+*.3mf
+
+# Local MCP server configuration — machine-specific paths.
+# Copy .mcp.json.example and fill in the placeholders.
+.mcp.json
