@@ -1,7 +1,7 @@
 (kicad_sch
-	(version 20250114)
+	(version 20260306)
 	(generator "eeschema")
-	(generator_version "9.0")
+	(generator_version "10.0")
 	(uuid "76974d0b-a0b3-4cc4-8298-143e20ce9df0")
 	(paper "A4")
 	(lib_symbols)
@@ -18,11 +18,13 @@
 			(type solid)
 		)
 		(fill
-			(color 0 0 0 0.0000)
+			(color 0 0 0 0)
 		)
 		(uuid "284803bb-50e7-4da3-9c93-e7c69332b824")
 		(property "Sheetname" "Buttons x3 right"
 			(at 114.3 151.6884 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -32,6 +34,8 @@
 		)
 		(property "Sheetfile" "buttons.kicad_sch"
 			(at 114.3 165.6846 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -90,11 +94,13 @@
 			(type solid)
 		)
 		(fill
-			(color 0 0 0 0.0000)
+			(color 0 0 0 0)
 		)
 		(uuid "48381f77-f010-4010-852a-3c63db8ae5e5")
 		(property "Sheetname" "Switches x3 left"
 			(at 35.56 103.4284 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -104,6 +110,8 @@
 		)
 		(property "Sheetfile" "switches.kicad_sch"
 			(at 35.56 118.6946 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -132,11 +140,13 @@
 			(type solid)
 		)
 		(fill
-			(color 0 0 0 0.0000)
+			(color 0 0 0 0)
 		)
 		(uuid "8617ba73-11fe-4a81-891e-d1eb47708db1")
 		(property "Sheetname" "Potentiometer x1"
 			(at 38.1 127.5584 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -146,6 +156,8 @@
 		)
 		(property "Sheetfile" "pot.kicad_sch"
 			(at 38.1 140.2846 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -174,11 +186,13 @@
 			(type solid)
 		)
 		(fill
-			(color 0 0 0 0.0000)
+			(color 0 0 0 0)
 		)
 		(uuid "8a22955f-4cbd-4285-87c2-9aaffbaadb9f")
 		(property "Sheetname" "Buttons x3 left"
 			(at 38.1 151.6884 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -188,6 +202,8 @@
 		)
 		(property "Sheetfile" "buttons.kicad_sch"
 			(at 38.1 165.6846 0)
+			(show_name no)
+			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
