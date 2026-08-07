@@ -76,6 +76,10 @@ See `.mcp.json.example` in the repository root. Two independent axes:
 Changing the profile when you meant to change the mode silently removes the
 entire schematic toolset.
 
+Both variables are read when the server process starts. Changing either one
+means restarting the MCP client — the running session will not pick up the
+new value, and the tool list it already computed does not change.
+
 ## Verified versus assumed
 
 Invoked and confirmed working on 2026-08-07, KiCad 10.0.5 + kicad-mcp-pro
