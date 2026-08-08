@@ -178,7 +178,47 @@ open before starting — `~<name>.kicad_sch.lck` next to the project names it.
   will happily recommend `manufacturing_quality_gate()`, which is itself
   unavailable in `write` mode.
 
-## PCB layout through the MCP server is not possible — a write kills the IPC link
+## A PCB write over IPC crashes KiCad — root cause, isolated
+
+**KiCad 10.0.5 terminates when a board mutation arrives over the IPC API.** Not
+a server bug, not a configuration problem: reproduced with ~10 lines of `kipy`
+talking straight to the socket with kicad-mcp-pro out of the picture entirely.
+
+```python
+from kipy import KiCad
+from kipy.geometry import Vector2
+k = KiCad(socket_path='ipc://<flatpak>/cache/tmp/kicad/api.sock', timeout_ms=30000)
+k.get_version()                       # 10.0.5 — fine
+b = k.get_board()
+fps = b.get_footprints()              # 12 footprints — reads are fine
+f = [x for x in fps if x.reference_field.text.value == "H101"][0]
+f.position = Vector2.from_xy_mm(104, 104)
+b.update_items([f])                   # -> timeout, and the KiCad process is gone
+```
+
+Connect and read work perfectly. The first `update_items()` never returns and
+the KiCad process disappears; the socket file survives as a stale artifact, so
+later connection attempts get `ConnectionRefused` rather than a missing file.
+
+Consequences:
+
+- **PCB layout cannot be automated on this install by any IPC client.** Updating
+  or downgrading kicad-mcp-pro will not help — the crash is below it.
+- Everything that looked like an MCP-server defect downstream of this — false
+  success strings, dropped connections, file-backed fallbacks — is a *symptom*
+  of KiCad having died mid-call.
+- Worth reporting upstream; the snippet above is a complete reproducer.
+
+Schematic writes are unaffected because they do not go through IPC at all — see
+below.
+
+---
+
+Everything from here down was measured while chasing the above, before the root
+cause was isolated. Kept because the symptoms are what a future session will
+meet first.
+
+## The MCP server's view of it: a write kills the IPC link
 
 Measured 2026-08-08 on kicad-mcp-pro 3.30.1 + KiCad 10.0.5. Confirmed on a
 deliberately clean stack after two inconclusive attempts:
