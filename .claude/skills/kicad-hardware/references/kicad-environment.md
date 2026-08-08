@@ -178,12 +178,18 @@ open before starting — `~<name>.kicad_sch.lck` next to the project names it.
   will happily recommend `manufacturing_quality_gate()`, which is itself
   unavailable in `write` mode.
 
-## PCB writes do not work at all — they report success and change nothing
+## PCB writes returned success and changed nothing — root cause not isolated
 
 Measured 2026-08-08 on kicad-mcp-pro 3.30.1 + KiCad 10.0.5, with the board open
-in the GUI, IPC connected, and the write tools present in the session.
+in the GUI, IPC reporting connected, and the write tools present in the session.
 
-**Every mutation returns a success string and never reaches the board.**
+**Every mutation returned a success string and none reached the board.**
+
+**Read the caveat below before treating this as "writes are broken".** The same
+session's IPC connection was later found to drop mid-run without recovering, and
+the KiCad instance under test had been running for a day with five accumulated
+API connections. The false-success behaviour is solidly established; *why* it
+happened is not.
 
 | Call | Returned | Board afterwards |
 |---|---|---|
@@ -199,34 +205,57 @@ string as evidence — always read the board back** with `pcb_get_footprints` /
 Reads are fine throughout. `pcb_get_board_summary` reports `Source: live-gui`
 and every `pcb_get_*` returns correct live data. Only writes are affected.
 
-Ruled out as causes, by retesting on a freshly started server:
+Ruled out:
 
 - **Not** a dangling transaction. The first attempt wrapped the deletes in
   `pcb_begin_commit`, which cannot be closed (see below), so a stuck transaction
   group looked like the obvious culprit. After a full restart, a single
   `pcb_move_footprint` with no transaction group behaved identically.
-- **Not** a missing PCB document, missing IPC, or missing tool registration —
-  all three were verified present in the same session.
+- **Not** missing tool registration — the write tools were present and callable.
 
-**Consequence: the PCB layout cannot be done through this server.** It has to
-happen in the KiCad GUI, which is what the skill's division of labour already
-prescribes — though for a different reason than the 2026 note records. The
-agent side remains useful for everything read-only: `run_drc`,
-`pcb_visual_qa`, `pcb_score_placement`, `pcb_critique_placement`,
+### The IPC connection drops mid-session and does not recover
+
+Found immediately afterwards, and it undermines the conclusion above.
+
+Within one session the same server went from `IPC version: 10.0.5 (10.0.5) /
+Open PCB documents: 1` to `IPC connection: unavailable`, with no restart of
+anything in between. After the drop, `pcb_move_footprint` returned a clean
+`BOARD_NOT_OPEN` error rather than a false success — so the server *can* report
+the condition correctly, which makes the earlier false successes look like a
+half-open connection rather than a dead code path.
+
+The drop does not heal. A plain Python client connected to the same socket
+without trouble, and `kicad_set_project()` did not re-establish it; only
+restarting the MCP server did.
+
+**So the write tests were run against a connection of unknown health**, and the
+KiCad instance at the time had been up for a day with five accumulated API
+connections (`ss -xp | grep api.sock`). Before concluding that layout through
+the server is impossible, retest on a genuinely clean stack: KiCad restarted and
+the board opened first, MCP client started second, then one write and an
+immediate read-back **as the first actions of the session**.
+
+Regardless of root cause, one rule holds: **a PCB write tool's return string is
+not evidence.** Read the board back after every mutation.
+
+Meanwhile the read-only side worked throughout and is what the agent can rely
+on: `run_drc`, `pcb_visual_qa`, `pcb_score_placement`, `pcb_critique_placement`,
 `validate_footprints_vs_schematic`, renders and the STEP → STL case-fit loop.
 
-### It also silently downgrades `.kicad_pro`
+### Opening a project in KiCad 9 downgrades `.kicad_pro`
 
-Simply having the server attached to a project rewrites the project file with an
-older net-class schema: `net_settings.meta.version` drops **5 → 4** and the
-per-netclass `tuning_profile` fields are removed. Observed on `encoder1.kicad_pro`
-and on `test.kicad_pro`, which showed the identical one-line-in / two-lines-out
-diff before any tool had been pointed at it.
+`net_settings.meta.version` drops **5 → 4** and the per-netclass
+`tuning_profile` fields disappear. Observed on `encoder1.kicad_pro` and
+`test.kicad_pro`.
 
-KiCad 10 writes version 5; the server writes 4. So the file oscillates between
-the two whenever both touch it. `git diff` the `.kicad_pro` before committing and
-revert it if the only change is this downgrade — otherwise the repo slowly loses
-KiCad 10 project settings.
+This was first blamed on the MCP server, wrongly. **KiCad 9 wrote it** — the
+project had been opened briefly in the system KiCad 9.0.8 before the user
+switched to the Flatpak KiCad 10. KiCad 10 writes schema 5, KiCad 9 writes 4, so
+the file flips whenever the wrong version opens it.
+
+Both installations are on this machine and the 9 one is the default on `$PATH`,
+so this is easy to trigger by accident. `git diff` the `.kicad_pro` before
+committing and revert it if the only change is this downgrade.
 
 ### The transaction family is broken too
 
