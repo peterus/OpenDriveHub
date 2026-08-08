@@ -7,11 +7,16 @@
 **Goal:** Produce an ERC-clean hierarchical KiCad schematic + locked BOM +
 net/footprint handoff list for the transmitter's `main` (brain) PCB.
 
-**Architecture:** One KiCad project (`hardware/transmitter/pcb/main/`) scaffolded
-from the `nav3` template, built as a hierarchical schematic with 7 functional
-sheets under a root. Components placed and connected with the kicad-mcp-pro
-`sch_*` tools; validated after every sheet with `kicad-cli` ERC + SVG render.
-**PCB layout is NOT in scope** — handoff to the user after ERC is clean (brief §9.5).
+**Architecture:** One KiCad project (`hardware/transmitter/pcb/main/`) created
+**fresh as a native KiCad 10 project** (via `kicad_create_new_project`), built as
+a hierarchical schematic with 7 functional sheets under a root. **nav3 is NOT
+reused** — it is a KiCad 9 project (`generator_version 9.0`) with known problems.
+If a clean-slate create is not possible, the fallback starter is the **encoder1**
+project from branch `origin/encoder1-schematic` (verified KiCad 10,
+`generator_version 10.0`) — never nav3. Components placed and connected with the
+kicad-mcp-pro `sch_*` tools; validated after every sheet with `kicad-cli` ERC +
+SVG render. **PCB layout is NOT in scope** — handoff to the user after ERC is
+clean (brief §9.5).
 
 **Tech Stack:** KiCad 10.0.5, kicad-cli-10, kicad-mcp-pro v3.30.1 (`sch_*`,
 `lib_*`, `run_erc`, `schematic_design_rule_check`), S-expression project files.
@@ -50,7 +55,7 @@ explicitly justified) AND a render has been visually inspected.
 
 ```
 hardware/transmitter/pcb/main/
-  main.kicad_pro          # project + DRC/ERC settings (from nav3, renamed)
+  main.kicad_pro          # project + DRC/ERC settings (fresh KiCad 10, or lifted from encoder1)
   main.kicad_sch          # ROOT sheet (sheet symbols → 7 children)
   main_01_power.kicad_sch
   main_02_mcu.kicad_sch
@@ -59,9 +64,9 @@ hardware/transmitter/pcb/main/
   main_05_audio.kicad_sch
   main_06_joystick_io.kicad_sch
   main_07_connectors_misc.kicad_sch
-  main_local.kicad_sym    # project-local flattened symbols (from nav3 + new)
+  main_local.kicad_sym    # project-local flattened symbols (new; BQ25798, MAX98357A, DS3231…)
   main.pretty/            # project-local footprints (only if a part needs one)
-  sym-lib-table           # registers main_local (from nav3, renamed)
+  sym-lib-table           # registers main_local (created fresh)
   fp-lib-table            # registers main.pretty (if used)
   BOM.md                  # locked part list with MPNs + symbol/footprint
   fab/                    # generated exports, .gitignored
@@ -75,8 +80,7 @@ that carries its own ERC+render gate, so each is its own task.
 ## Task 0: Toolchain preflight + project scaffold
 
 **Files:**
-- Create: whole `hardware/transmitter/pcb/main/` (copied from `nav3/`)
-- Modify: `main.kicad_pro`, `sym-lib-table` (rename strings)
+- Create: whole `hardware/transmitter/pcb/main/` (fresh KiCad 10 project)
 
 **Interfaces:**
 - Produces: a loadable `main` project with an empty root schematic, confirmed
@@ -85,36 +89,49 @@ that carries its own ERC+render gate, so each is its own task.
 - [ ] **Step 1: Preflight the tools.** Call `kicad_get_version()`. Confirm CLI
   version == IPC version and note whether IPC is connected. Then confirm the
   specific tools this plan needs are actually callable (registry over-reports):
-  `sch_add_component`, `sch_add_label`, `sch_find_free_placement`,
-  `sch_check_power_flags`, `run_erc`, `schematic_design_rule_check`,
-  `sch_render_png`, `lib_create_custom_symbol`, `lib_assign_footprint`.
-  Expected: all resolve. If `sch_*` live-edit tools are gated by missing IPC
-  and cannot be made to work → **STOP**, report to the user, and hand the spec
-  to GUI capture instead of hand-editing S-expressions (Global Constraints).
+  `kicad_create_new_project`, `sch_add_component`, `sch_add_label`,
+  `sch_find_free_placement`, `sch_check_power_flags`, `run_erc`,
+  `schematic_design_rule_check`, `sch_render_png`, `lib_create_custom_symbol`,
+  `lib_assign_footprint`. Expected: all resolve. If `sch_*` live-edit tools are
+  gated by missing IPC and cannot be made to work → **STOP**, report to the
+  user, and hand the spec to GUI capture instead of hand-editing S-expressions
+  (Global Constraints).
 
-- [ ] **Step 2: Scaffold from nav3.**
+- [ ] **Step 2: Create the project fresh (KiCad 10).**
 
+```
+kicad_create_new_project(path=".../hardware/transmitter/pcb/main", name="main")
+```
+This yields a native KiCad-10 `main.kicad_pro` + empty `main.kicad_sch` +
+`main.kicad_pcb`. **Do NOT copy nav3** (KiCad 9). If `kicad_create_new_project`
+is unavailable/broken, FALLBACK: copy the KiCad-10 `encoder1` project from the
+other branch, then rename —
 ```bash
 cd hardware/transmitter/pcb
-cp -r nav3 main
-cd main
-for f in nav3.*; do mv "$f" "${f/nav3/main}"; done
-mv nav3_local.kicad_sym main_local.kicad_sym
-sed -i 's/nav3/main/g' *.kicad_pro *.kicad_pcb sym-lib-table
-rm -rf nav3-backups output ~*.lck main.kicad_pcb
+git show origin/encoder1-schematic:hardware/transmitter/pcb/encoder1/encoder1.kicad_pro > /tmp/e.pro  # sanity: version 10.0
+mkdir -p main && cd main
+for f in encoder1.kicad_pro encoder1.kicad_sch encoder1_local.kicad_sym sym-lib-table; do
+  git show "origin/encoder1-schematic:hardware/transmitter/pcb/encoder1/$f" > "${f/encoder1/main}"
+done
+sed -i 's/encoder1/main/g' main.kicad_pro sym-lib-table
 ```
+then strip the encoder1 schematic content to an empty root (via `sch_get_symbols`
++ delete, or GUI). Never fall back to nav3.
 
-- [ ] **Step 3: Strip nav3 schematic content** to an empty root. In the KiCad
-  GUI (or via `sch_get_symbols` then delete), remove all nav3 symbols/wires from
-  `main.kicad_sch`, keeping the file header, project settings, and title block.
-
-- [ ] **Step 4: Set project + design intent.**
+- [ ] **Step 3: Set project + design intent.**
 
 ```
 kicad_set_project(project_dir=".../pcb/main", sch_file="main.kicad_sch")
 ```
-Then `project_set_design_intent` with: 2-layer→(user may raise), 3.3 V logic,
-handheld, hand-assembly-friendly 0805 passives.
+Then `project_set_design_intent` — feed it directly from our spec via
+`project_import_design_spec(path="docs/superpowers/specs/2026-08-08-transmitter-main-pcb-design.md", dry_run=True)`,
+review the parsed intent, then re-run with `dry_run=False`. Confirms power_rails
+(3V3, SYS, VBAT, VBUS), the two I²C interfaces, required sheets, and
+hand-assembly 0805 passives.
+
+- [ ] **Step 4: Register the project-local symbol lib.** Create empty
+  `main_local.kicad_sym` + `sym-lib-table` entry (fresh; if the encoder1 fallback
+  was used, its `sym-lib-table` is already KiCad-10 and just needs the rename).
 
 - [ ] **Step 5: ERC smoke test.**
 
@@ -122,12 +139,13 @@ handheld, hand-assembly-friendly 0805 passives.
 kicad-cli sch erc main.kicad_sch --output fab/erc.json --format json --severity-all
 ```
 Expected: loads without "Failed to load schematic"; empty sheet → no violations.
+Confirm the file stamp is KiCad 10 (`generator_version "10.0"`), NOT 9.
 
 - [ ] **Step 6: Commit.**
 
 ```bash
 git add hardware/transmitter/pcb/main
-git commit -m "main pcb: scaffold KiCad project from nav3 template"
+git commit -m "main pcb: scaffold fresh KiCad 10 project"
 ```
 
 ---
@@ -157,8 +175,8 @@ git commit -m "main pcb: scaffold KiCad project from nav3 template"
   `lib_generate_symbol_from_pintable`: **BQ25798** (QFN-29), **MAX98357A**
   (QFN-16), **DS3231SN** (SOIC-16W). Cross-check every pin against the datasheet.
 
-- [ ] **Step 3: Write `BOM.md`** in the nav3 format (Ref | Qty | Value | Symbol
-  | Footprint | Source | Notes), covering spec §9 parts + all passives from
+- [ ] **Step 3: Write `BOM.md`** using the table format Ref | Qty | Value |
+  Symbol | Footprint | Source | Notes, covering spec §9 parts + all passives from
   spec §4/§7 (pull-ups: I2C0 4.7k×2, I2C1 4.7k×2, 8× channel pairs 4.7k, 8×
   INT 10k, touch 10k; CC 5.1k×2; MUX_RST 10k; EN 10k/1µF; decoupling 100nF per
   IC pin; bulk caps; charger inductor + sense R; CR1220 + holder). MPNs
