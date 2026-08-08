@@ -178,7 +178,111 @@ open before starting — `~<name>.kicad_sch.lck` next to the project names it.
   will happily recommend `manufacturing_quality_gate()`, which is itself
   unavailable in `write` mode.
 
+## PCB writes do not work at all — they report success and change nothing
+
+Measured 2026-08-08 on kicad-mcp-pro 3.30.1 + KiCad 10.0.5, with the board open
+in the GUI, IPC connected, and the write tools present in the session.
+
+**Every mutation returns a success string and never reaches the board.**
+
+| Call | Returned | Board afterwards |
+|---|---|---|
+| `pcb_delete_items` (50 UUIDs) | `Deleted 50 item(s).` | unchanged — still 33 tracks, 12 footprints, 1 zone, 4 shapes |
+| `pcb_delete_items` (1 UUID) | `Deleted 1 item(s).` | unchanged |
+| `pcb_move_footprint("H101", 104, 104)` | `Moved footprint 'H101' to (104.0, 104.0) mm **with verified rotation** 0.000 degrees` | `H101` still at (103.00, 103.00) |
+
+The `pcb_move_footprint` message is the dangerous one: it claims to have
+*verified* the result. It has not. **Never treat a PCB write tool's return
+string as evidence — always read the board back** with `pcb_get_footprints` /
+`pcb_get_board_summary`.
+
+Reads are fine throughout. `pcb_get_board_summary` reports `Source: live-gui`
+and every `pcb_get_*` returns correct live data. Only writes are affected.
+
+Ruled out as causes, by retesting on a freshly started server:
+
+- **Not** a dangling transaction. The first attempt wrapped the deletes in
+  `pcb_begin_commit`, which cannot be closed (see below), so a stuck transaction
+  group looked like the obvious culprit. After a full restart, a single
+  `pcb_move_footprint` with no transaction group behaved identically.
+- **Not** a missing PCB document, missing IPC, or missing tool registration —
+  all three were verified present in the same session.
+
+**Consequence: the PCB layout cannot be done through this server.** It has to
+happen in the KiCad GUI, which is what the skill's division of labour already
+prescribes — though for a different reason than the 2026 note records. The
+agent side remains useful for everything read-only: `run_drc`,
+`pcb_visual_qa`, `pcb_score_placement`, `pcb_critique_placement`,
+`validate_footprints_vs_schematic`, renders and the STEP → STL case-fit loop.
+
+### It also silently downgrades `.kicad_pro`
+
+Simply having the server attached to a project rewrites the project file with an
+older net-class schema: `net_settings.meta.version` drops **5 → 4** and the
+per-netclass `tuning_profile` fields are removed. Observed on `encoder1.kicad_pro`
+and on `test.kicad_pro`, which showed the identical one-line-in / two-lines-out
+diff before any tool had been pointed at it.
+
+KiCad 10 writes version 5; the server writes 4. So the file oscillates between
+the two whenever both touch it. `git diff` the `.kicad_pro` before committing and
+revert it if the only change is this downgrade — otherwise the repo slowly loses
+KiCad 10 project settings.
+
+### The transaction family is broken too
+
+`pcb_begin_commit` succeeds, but both ways of ending the transaction crash:
+
+    pcb_push_commit  -> Board.push_commit() missing 1 required positional argument: 'commit'
+    pcb_drop_commit  -> Board.drop_commit() missing 1 required positional argument: 'commit'
+
+So a transaction group, once opened, can be neither applied nor discarded. Do
+not call `pcb_begin_commit`.
+
+## PCB write tools need a board open *before* the server starts
+
+Measured 2026-08-08 while trying to lay out `encoder1`.
+
+The 48 `pcb_write` tools — `pcb_set_board_outline`, `pcb_sync_from_schematic`,
+`pcb_place_component`, `pcb_move_footprint`, `pcb_add_track`,
+`pcb_add_copper_zone`, `pcb_refill_zones`, `pcb_delete_items`, `pcb_save` and the
+rest — are registered only if a PCB document is open in KiCad **at the moment the
+MCP server process starts**. This is the same start-time gate the IPC section
+above describes for `sch_*`, and it behaves the same way: opening the board
+afterwards does not make the tools appear.
+
+What *does* start working immediately is live PCB **reading**.
+`pcb_get_board_summary` reports `Source: live-gui` and `pcb_get_footprints`
+returns the open board's placement as soon as KiCad has it open. That asymmetry
+is misleading — live reads working is not evidence that writes will.
+
+To lay out a board: open both the `.kicad_pcb` and the `.kicad_sch` in KiCad
+first, then start the MCP client.
+
+## `kicad_get_tools_in_category()` is not evidence of callability
+
+Same session. With no PCB open at server start,
+`kicad_get_tools_in_category("pcb_write")` still listed all 48 tool names with
+maturity flags and `Active operating mode: write`, implying they were ready.
+None of them existed in the session. The call reads the server's **static
+registry**, not what this session can invoke.
+
+The authoritative check is whether the tool is present in the session's own tool
+list — on a deferred-tool harness, whether `ToolSearch` can resolve the name. If
+it returns "no matching deferred tools found", the tool cannot be called no
+matter what the registry says.
+
+This is the concrete case behind the Preflight rule in the skill: confirm the
+specific tools your plan depends on are callable *before* planning around them.
+
 ## Known defects (measured on KiCad 10.0.5 + kicad-mcp-pro 3.30.1)
+
+**`pcb_get_origin` always fails.** It raises
+`Board.get_origin() missing 1 required positional argument: 'origin_type'` — the
+server calls the KiCad API without the required argument and exposes no
+parameter to supply it. There is no workaround through the tool; read the
+origin from the `.kicad_pcb` or the GUI instead. (Measured 2026-08-08 on a live
+board that every other `pcb_get_*` read fine.)
+
 
 **`sch_build_circuit` orphans child sheets.** It rebuilds one file — the active
 schematic — from scratch with a fresh root UUID and a flat

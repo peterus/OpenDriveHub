@@ -130,14 +130,38 @@ sub-PCBs.
 - B.Cu (case-interior side): U101, C101–C103, R101/R102, J101, second OSHW logo
 - B.Cu carries a solid GND pour over the full board
 - Mount holes 3 mm inset from each corner (4× M2)
-- Board outline: **TBD** — set during layout, then written back here and into
-  `ENCODER_PCB_SIZE` in `parts/pcb_subpanel.scad`
+- Board outline: **36 × 30 mm**, agreed 2026-08-08. Mount holes at (±15, ±12),
+  3 mm inset. Still to be written into `ENCODER_PCB_SIZE` in
+  `parts/pcb_subpanel.scad`, which currently estimates 30 × 22 mm
 
-**Expect the outline to grow.** `pcb_subpanel.scad` currently estimates
-30 × 22 mm, but the EC11 footprint alone claims 17.5 × 14.2 mm, and it shares the
-board with a SOIC-16W (11.9 × 10.8 mm), five 0805 passives, a JST-XH connector and
-four M2 corner holes. `nav3` went from an estimated 32 × 16 to an actual 32 × 30
-for exactly this reason.
+### Why 36 × 30, and the two offsets it needs
+
+The parts cannot stack in Y: EC11 (14.2) + SOIC-16W (10.8) + JST-XH (6.2) is
+**31.2 mm** of bodies before any margin, against the brief's 30 mm ceiling on
+sub-PCB height. The IC and the connector therefore sit side by side, which needs
+11.9 + 14.6 = 26.5 mm of clear width; with 3 mm hole insets that puts the board
+at **36 mm** wide.
+
+`nav3` got away with 32 × 30 because a 6 mm tact over a TSSOP-16 is a far shorter
+stack. The EC11 alone is as tall as nav3's switch and IC combined.
+
+**The board is offset 3 mm outboard of the encoder axis.** Centred on the encoder
+at x = −30 a 36 mm board would span −48…−12, and `nav3` reaches to −16 with its
+leftmost switch at x = −13.25 — those through-hole switch pins would sit directly
+over this board's edge with only 1.4 mm of clearance (3 mm Z spacing less the
+1.6 mm board). Shifting the board centre to x = −33 moves its edge to −15 and
+removes the conflict; the cavity extends to ±134 and the corner boss sits at
+−129, so there is room outboard.
+
+Two offsets therefore go into `parts/layout_front.scad`, the same pattern nav3
+already uses for its −5 mm Y shift (`PCB_DESIGN_BRIEF.md` §9.7):
+
+| Axis | Offset | Reason |
+|------|--------|--------|
+| X | 3 mm outboard | clear `nav3`'s switch pins |
+| Y | ~6 mm | encoder sits above the IC/connector row |
+
+Mirror the X sign for the right-hand board.
 
 ## Validation status (schematic, 2026-08-07)
 
