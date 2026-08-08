@@ -220,6 +220,37 @@ Read-only work is unaffected and remains the agent's useful contribution:
 `run_drc`, `pcb_visual_qa`, `pcb_score_placement`, `pcb_critique_placement`,
 `validate_footprints_vs_schematic`, renders, and the STEP → STL case-fit loop.
 
+### Schematic writes are fine — the split is architectural, not general
+
+Tested straight afterwards, with the IPC link already dead from the PCB write:
+`sch_set_title_block_info` wrote a field, reported `roundtrip: validated` with
+before/after hashes, and the change was confirmed present in the file. Reverting
+it worked the same way. Element counts and the exported netlist were unchanged
+throughout.
+
+So this is **not** "IPC writes are broken". It follows the server's own
+per-category fallback policy, visible in `kicad_get_server_info`:
+
+| Category | Policy |
+|---|---|
+| `schematic` | IPC when required, otherwise a **transactional file writer** with structural fingerprint loss detection |
+| `pcb_write` | **Fail closed** when an IPC-required mutation has no live backend |
+
+Schematic mutations have a file-backed path and survive a dead IPC link. PCB
+mutations do not — and since the first PCB write kills the link, they never
+succeed. **Schematic capture through the agent is fine; PCB layout is not.**
+
+### A KiCad 10 save re-serialises the whole schematic
+
+Unrelated to correctness, but alarming at first sight: after the user saved the
+schematic in KiCad 10, `git diff` showed 267 insertions and 402 deletions
+including apparently-removed `(wire ...)` blocks. Nothing was lost — elements
+are just re-ordered in the file. Counts of `wire`, `label`, `junction`,
+`no_connect` and `symbol` were identical before and after, and so was the
+exported netlist.
+
+Check counts and the netlist before reacting to a large `.kicad_sch` diff.
+
 | Call | Returned | Board afterwards |
 |---|---|---|
 | `pcb_delete_items` (50 UUIDs) | `Deleted 50 item(s).` | unchanged — still 33 tracks, 12 footprints, 1 zone, 4 shapes |
