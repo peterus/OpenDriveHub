@@ -178,7 +178,212 @@ open before starting — `~<name>.kicad_sch.lck` next to the project names it.
   will happily recommend `manufacturing_quality_gate()`, which is itself
   unavailable in `write` mode.
 
+## A PCB write over IPC crashes KiCad — root cause, isolated
+
+**KiCad 10.0.5 terminates when a board mutation arrives over the IPC API.** Not
+a server bug, not a configuration problem: reproduced with ~10 lines of `kipy`
+talking straight to the socket with kicad-mcp-pro out of the picture entirely.
+
+```python
+from kipy import KiCad
+from kipy.geometry import Vector2
+k = KiCad(socket_path='ipc://<flatpak>/cache/tmp/kicad/api.sock', timeout_ms=30000)
+k.get_version()                       # 10.0.5 — fine
+b = k.get_board()
+fps = b.get_footprints()              # 12 footprints — reads are fine
+f = [x for x in fps if x.reference_field.text.value == "H101"][0]
+f.position = Vector2.from_xy_mm(104, 104)
+b.update_items([f])                   # -> timeout, and the KiCad process is gone
+```
+
+Connect and read work perfectly. The first `update_items()` never returns and
+the KiCad process disappears; the socket file survives as a stale artifact, so
+later connection attempts get `ConnectionRefused` rather than a missing file.
+
+Consequences:
+
+- **PCB layout cannot be automated on this install by any IPC client.** Updating
+  or downgrading kicad-mcp-pro will not help — the crash is below it.
+- Everything that looked like an MCP-server defect downstream of this — false
+  success strings, dropped connections, file-backed fallbacks — is a *symptom*
+  of KiCad having died mid-call.
+- Worth reporting upstream; the snippet above is a complete reproducer.
+
+Schematic writes are unaffected because they do not go through IPC at all — see
+below.
+
+---
+
+Everything from here down was measured while chasing the above, before the root
+cause was isolated. Kept because the symptoms are what a future session will
+meet first.
+
+## The MCP server's view of it: a write kills the IPC link
+
+Measured 2026-08-08 on kicad-mcp-pro 3.30.1 + KiCad 10.0.5. Confirmed on a
+deliberately clean stack after two inconclusive attempts:
+
+- KiCad 10 freshly restarted, schematic and board both saved and open
+- MCP client started afterwards, so the write tools registered
+- `kicad_get_version` reporting `IPC version: 10.0.5`, `Open PCB documents: 1`
+- **a single `pcb_move_footprint` as the first action of the session**
+
+Result: `CLI_TIMEOUT: Error receiving reply from KiCad: Timed out`, the board
+unchanged, and the connection dead. The server's own diagnostics then read
+*"The KiCad IPC connection dropped (KiCad may have closed or restarted) and did
+not recover."* Nothing had closed or restarted — the write did it.
+
+**Do not attempt PCB layout through this server.** Placement, routing, zones and
+board outline all have to happen in the KiCad GUI. This matches the skill's
+division of labour, though for a different reason than the 2026 note recorded.
+
+### Why this took three sessions to pin down
+
+After the connection dies, reads keep working — they **silently fall back to
+parsing the `.kicad_pcb` file**. `pcb_get_footprints` still returns correct,
+plausible data, labelled `file-backed fallback` in a diagnostics block that is
+easy to skim past. So the board "reads fine" while every write vanishes.
+
+Earlier attempts saw the same underlying failure wearing a different mask:
+mutations returned cheerful success strings (`Deleted 50 item(s).`,
+`Moved footprint 'H101' to (104.0, 104.0) mm with verified rotation`) against an
+unchanged board. The `with verified rotation` wording is outright false.
+
+Two rules follow:
+
+1. **A PCB write tool's return string is not evidence.** Read the board back.
+2. **Check the read's `Source:` field.** `live-gui` means the editor;
+   `file-backed fallback` means the IPC link is gone and you are looking at
+   disk, not at what the tool claims to have changed.
+
+Read-only work is unaffected and remains the agent's useful contribution:
+`run_drc`, `pcb_visual_qa`, `pcb_score_placement`, `pcb_critique_placement`,
+`validate_footprints_vs_schematic`, renders, and the STEP → STL case-fit loop.
+
+### Schematic writes are fine — the split is architectural, not general
+
+Tested straight afterwards, with the IPC link already dead from the PCB write:
+`sch_set_title_block_info` wrote a field, reported `roundtrip: validated` with
+before/after hashes, and the change was confirmed present in the file. Reverting
+it worked the same way. Element counts and the exported netlist were unchanged
+throughout.
+
+So this is **not** "IPC writes are broken". It follows the server's own
+per-category fallback policy, visible in `kicad_get_server_info`:
+
+| Category | Policy |
+|---|---|
+| `schematic` | IPC when required, otherwise a **transactional file writer** with structural fingerprint loss detection |
+| `pcb_write` | **Fail closed** when an IPC-required mutation has no live backend |
+
+Schematic mutations have a file-backed path and survive a dead IPC link. PCB
+mutations do not — and since the first PCB write kills the link, they never
+succeed. **Schematic capture through the agent is fine; PCB layout is not.**
+
+### A KiCad 10 save re-serialises the whole schematic
+
+Unrelated to correctness, but alarming at first sight: after the user saved the
+schematic in KiCad 10, `git diff` showed 267 insertions and 402 deletions
+including apparently-removed `(wire ...)` blocks. Nothing was lost — elements
+are just re-ordered in the file. Counts of `wire`, `label`, `junction`,
+`no_connect` and `symbol` were identical before and after, and so was the
+exported netlist.
+
+Check counts and the netlist before reacting to a large `.kicad_sch` diff.
+
+| Call | Returned | Board afterwards |
+|---|---|---|
+| `pcb_delete_items` (50 UUIDs) | `Deleted 50 item(s).` | unchanged — still 33 tracks, 12 footprints, 1 zone, 4 shapes |
+| `pcb_delete_items` (1 UUID) | `Deleted 1 item(s).` | unchanged |
+| `pcb_move_footprint("H101", 104, 104)` | `Moved footprint 'H101' to (104.0, 104.0) mm **with verified rotation** 0.000 degrees` | `H101` still at (103.00, 103.00) |
+
+The `pcb_move_footprint` message is the dangerous one: it claims to have
+*verified* the result. It has not. **Never treat a PCB write tool's return
+string as evidence — always read the board back** with `pcb_get_footprints` /
+`pcb_get_board_summary`.
+
+Reads are fine throughout. `pcb_get_board_summary` reports `Source: live-gui`
+and every `pcb_get_*` returns correct live data. Only writes are affected.
+
+Also ruled out along the way: a dangling `pcb_begin_commit` transaction, a
+missing PCB document, missing IPC, missing tool registration, and a stale KiCad
+instance with accumulated API connections. None of them was the cause; the final
+test had all of them excluded by construction.
+
+The dead connection never heals on its own. A plain Python client still opens
+the socket fine and `kicad_set_project()` does not re-establish it — only
+restarting the MCP server does, and the next write kills it again.
+
+### Opening a project in KiCad 9 downgrades `.kicad_pro`
+
+`net_settings.meta.version` drops **5 → 4** and the per-netclass
+`tuning_profile` fields disappear. Observed on `encoder1.kicad_pro` and
+`test.kicad_pro`.
+
+This was first blamed on the MCP server, wrongly. **KiCad 9 wrote it** — the
+project had been opened briefly in the system KiCad 9.0.8 before the user
+switched to the Flatpak KiCad 10. KiCad 10 writes schema 5, KiCad 9 writes 4, so
+the file flips whenever the wrong version opens it.
+
+Both installations are on this machine and the 9 one is the default on `$PATH`,
+so this is easy to trigger by accident. `git diff` the `.kicad_pro` before
+committing and revert it if the only change is this downgrade.
+
+### The transaction family is broken too
+
+`pcb_begin_commit` succeeds, but both ways of ending the transaction crash:
+
+    pcb_push_commit  -> Board.push_commit() missing 1 required positional argument: 'commit'
+    pcb_drop_commit  -> Board.drop_commit() missing 1 required positional argument: 'commit'
+
+So a transaction group, once opened, can be neither applied nor discarded. Do
+not call `pcb_begin_commit`.
+
+## PCB write tools need a board open *before* the server starts
+
+Measured 2026-08-08 while trying to lay out `encoder1`.
+
+The 48 `pcb_write` tools — `pcb_set_board_outline`, `pcb_sync_from_schematic`,
+`pcb_place_component`, `pcb_move_footprint`, `pcb_add_track`,
+`pcb_add_copper_zone`, `pcb_refill_zones`, `pcb_delete_items`, `pcb_save` and the
+rest — are registered only if a PCB document is open in KiCad **at the moment the
+MCP server process starts**. This is the same start-time gate the IPC section
+above describes for `sch_*`, and it behaves the same way: opening the board
+afterwards does not make the tools appear.
+
+What *does* start working immediately is live PCB **reading**.
+`pcb_get_board_summary` reports `Source: live-gui` and `pcb_get_footprints`
+returns the open board's placement as soon as KiCad has it open. That asymmetry
+is misleading — live reads working is not evidence that writes will.
+
+To lay out a board: open both the `.kicad_pcb` and the `.kicad_sch` in KiCad
+first, then start the MCP client.
+
+## `kicad_get_tools_in_category()` is not evidence of callability
+
+Same session. With no PCB open at server start,
+`kicad_get_tools_in_category("pcb_write")` still listed all 48 tool names with
+maturity flags and `Active operating mode: write`, implying they were ready.
+None of them existed in the session. The call reads the server's **static
+registry**, not what this session can invoke.
+
+The authoritative check is whether the tool is present in the session's own tool
+list — on a deferred-tool harness, whether `ToolSearch` can resolve the name. If
+it returns "no matching deferred tools found", the tool cannot be called no
+matter what the registry says.
+
+This is the concrete case behind the Preflight rule in the skill: confirm the
+specific tools your plan depends on are callable *before* planning around them.
+
 ## Known defects (measured on KiCad 10.0.5 + kicad-mcp-pro 3.30.1)
+
+**`pcb_get_origin` always fails.** It raises
+`Board.get_origin() missing 1 required positional argument: 'origin_type'` — the
+server calls the KiCad API without the required argument and exposes no
+parameter to supply it. There is no workaround through the tool; read the
+origin from the `.kicad_pcb` or the GUI instead. (Measured 2026-08-08 on a live
+board that every other `pcb_get_*` read fine.)
+
 
 **`sch_build_circuit` orphans child sheets.** It rebuilds one file — the active
 schematic — from scratch with a fresh root UUID and a flat

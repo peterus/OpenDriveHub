@@ -497,26 +497,61 @@ The AI then takes the STEP back into the OpenSCAD case-fit check.
 
 ## 9.6 Starting a new sub-PCB (template procedure)
 
-`pcb/nav3/` is the canonical template — it carries the project and
-board settings plus a flattened symbol library that transfer directly
-to other sub-PCBs. To bootstrap a new board (e.g. `toggle3`):
+**Copy the most recently corrected board, not the oldest one.** The template
+carries project settings, DRC rules and a flattened symbol library — but it also
+carries every stale fact its title block and BOM still contain. `toggle3` and
+`encoder1` were both bootstrapped from `nav3` and both needed the same three
+corrections re-applied by hand, because `nav3` still has them.
+
+Current template: **`pcb/encoder1/`**. Before copying anything, verify the
+candidate actually has these right, and if it does not, pick another board or
+fix it first:
+
+| Check | Correct value |
+|---|---|
+| Title-block I²C address | 0x38 — not 0x3F |
+| Title-block cable description | 5-pin JST-XH — not 4-pin |
+| U101 footprint | `Package_SO:SOIC-16W_7.5x10.3mm_P1.27mm` — TSSOP-16 is not orderable |
+| U101 value / MPN | `PCF8574A` / `PCF8574ADWR` |
+| `kicad-cli-10 sch erc` | 0 violations |
+| `kicad-cli sch export netlist` | no annotation warning |
+
+To bootstrap a new board (e.g. `illum3`):
 
 ```bash
 cd hardware/transmitter/pcb
-cp -r nav3 toggle3
-cd toggle3
+cp -r encoder1 illum3
+cd illum3
 # Rename the project files
-for f in nav3.*; do mv "$f" "${f/nav3/toggle3}"; done
-mv nav3_local.kicad_sym toggle3_local.kicad_sym
-# Substitute the string "nav3" → "toggle3" inside the project files
-sed -i 's/nav3/toggle3/g' *.kicad_pro *.kicad_pcb sym-lib-table
-# Rip out the nav3 schematic content (sheet contents, NOT the file
-# header) so you start from an empty schematic with the same project
-# settings, DRC rules, and symbol library
-# (best done in the KiCad GUI: open the schematic, select all, delete)
+for f in encoder1.*; do mv "$f" "${f/encoder1/illum3}"; done
+mv encoder1_local.kicad_sym illum3_local.kicad_sym
+# Substitute the name inside the project files (case-sensitive, so
+# net names in CAPS are untouched)
+sed -i 's/encoder1/illum3/g' *.kicad_pro *.kicad_sch *.kicad_pcb sym-lib-table
 # Drop the gitignored junk so it doesn't carry over
-rm -rf nav3-backups output ~*.lck
+rm -rf encoder1-backups output fp-info-cache .kicad-mcp ~*.lck
+rm -f *.kicad_prl *.step *.png *.svg *.pdf *.json
 ```
+
+Keep the copied schematic content rather than emptying the sheet — every
+sub-PCB shares the PCF8574A, its decoupling cap, the JST-XH connector, the four
+mounting holes and both OSHW logos. Only the input devices differ, so deleting
+three symbols beats redrawing the other ten.
+
+**The board file still carries the template's layout.** Clear it in the PCB
+editor (select all → delete) before placing, then *Update PCB from Schematic*.
+
+**Two recurring fixes no template can prevent**, because they come from placing
+*new* symbols rather than from the copy — expect them on every board and clear
+them in the GUI before hand-off:
+
+- `sch_add_power_symbol` writes hash references (`#PWRb9ee`) → *Tools → Annotate
+  Schematic* with *Keep existing annotations*
+- newly placed symbols land as KiCad 9 definitions → *Tools → Update Symbols
+  from Library*
+
+Both are documented in
+`.claude/skills/kicad-hardware/references/kicad-environment.md`.
 
 Once the new project boots cleanly:
 

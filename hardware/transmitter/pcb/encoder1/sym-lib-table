@@ -1,0 +1,4 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "encoder1_local")(type "KiCad")(uri "${KIPRJMOD}/encoder1_local.kicad_sym")(options "")(descr "Project-local symbols for encoder1"))
+)
