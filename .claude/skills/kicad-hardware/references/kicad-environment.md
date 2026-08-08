@@ -178,18 +178,47 @@ open before starting — `~<name>.kicad_sch.lck` next to the project names it.
   will happily recommend `manufacturing_quality_gate()`, which is itself
   unavailable in `write` mode.
 
-## PCB writes returned success and changed nothing — root cause not isolated
+## PCB layout through the MCP server is not possible — a write kills the IPC link
 
-Measured 2026-08-08 on kicad-mcp-pro 3.30.1 + KiCad 10.0.5, with the board open
-in the GUI, IPC reporting connected, and the write tools present in the session.
+Measured 2026-08-08 on kicad-mcp-pro 3.30.1 + KiCad 10.0.5. Confirmed on a
+deliberately clean stack after two inconclusive attempts:
 
-**Every mutation returned a success string and none reached the board.**
+- KiCad 10 freshly restarted, schematic and board both saved and open
+- MCP client started afterwards, so the write tools registered
+- `kicad_get_version` reporting `IPC version: 10.0.5`, `Open PCB documents: 1`
+- **a single `pcb_move_footprint` as the first action of the session**
 
-**Read the caveat below before treating this as "writes are broken".** The same
-session's IPC connection was later found to drop mid-run without recovering, and
-the KiCad instance under test had been running for a day with five accumulated
-API connections. The false-success behaviour is solidly established; *why* it
-happened is not.
+Result: `CLI_TIMEOUT: Error receiving reply from KiCad: Timed out`, the board
+unchanged, and the connection dead. The server's own diagnostics then read
+*"The KiCad IPC connection dropped (KiCad may have closed or restarted) and did
+not recover."* Nothing had closed or restarted — the write did it.
+
+**Do not attempt PCB layout through this server.** Placement, routing, zones and
+board outline all have to happen in the KiCad GUI. This matches the skill's
+division of labour, though for a different reason than the 2026 note recorded.
+
+### Why this took three sessions to pin down
+
+After the connection dies, reads keep working — they **silently fall back to
+parsing the `.kicad_pcb` file**. `pcb_get_footprints` still returns correct,
+plausible data, labelled `file-backed fallback` in a diagnostics block that is
+easy to skim past. So the board "reads fine" while every write vanishes.
+
+Earlier attempts saw the same underlying failure wearing a different mask:
+mutations returned cheerful success strings (`Deleted 50 item(s).`,
+`Moved footprint 'H101' to (104.0, 104.0) mm with verified rotation`) against an
+unchanged board. The `with verified rotation` wording is outright false.
+
+Two rules follow:
+
+1. **A PCB write tool's return string is not evidence.** Read the board back.
+2. **Check the read's `Source:` field.** `live-gui` means the editor;
+   `file-backed fallback` means the IPC link is gone and you are looking at
+   disk, not at what the tool claims to have changed.
+
+Read-only work is unaffected and remains the agent's useful contribution:
+`run_drc`, `pcb_visual_qa`, `pcb_score_placement`, `pcb_critique_placement`,
+`validate_footprints_vs_schematic`, renders, and the STEP → STL case-fit loop.
 
 | Call | Returned | Board afterwards |
 |---|---|---|
@@ -205,42 +234,14 @@ string as evidence — always read the board back** with `pcb_get_footprints` /
 Reads are fine throughout. `pcb_get_board_summary` reports `Source: live-gui`
 and every `pcb_get_*` returns correct live data. Only writes are affected.
 
-Ruled out:
+Also ruled out along the way: a dangling `pcb_begin_commit` transaction, a
+missing PCB document, missing IPC, missing tool registration, and a stale KiCad
+instance with accumulated API connections. None of them was the cause; the final
+test had all of them excluded by construction.
 
-- **Not** a dangling transaction. The first attempt wrapped the deletes in
-  `pcb_begin_commit`, which cannot be closed (see below), so a stuck transaction
-  group looked like the obvious culprit. After a full restart, a single
-  `pcb_move_footprint` with no transaction group behaved identically.
-- **Not** missing tool registration — the write tools were present and callable.
-
-### The IPC connection drops mid-session and does not recover
-
-Found immediately afterwards, and it undermines the conclusion above.
-
-Within one session the same server went from `IPC version: 10.0.5 (10.0.5) /
-Open PCB documents: 1` to `IPC connection: unavailable`, with no restart of
-anything in between. After the drop, `pcb_move_footprint` returned a clean
-`BOARD_NOT_OPEN` error rather than a false success — so the server *can* report
-the condition correctly, which makes the earlier false successes look like a
-half-open connection rather than a dead code path.
-
-The drop does not heal. A plain Python client connected to the same socket
-without trouble, and `kicad_set_project()` did not re-establish it; only
-restarting the MCP server did.
-
-**So the write tests were run against a connection of unknown health**, and the
-KiCad instance at the time had been up for a day with five accumulated API
-connections (`ss -xp | grep api.sock`). Before concluding that layout through
-the server is impossible, retest on a genuinely clean stack: KiCad restarted and
-the board opened first, MCP client started second, then one write and an
-immediate read-back **as the first actions of the session**.
-
-Regardless of root cause, one rule holds: **a PCB write tool's return string is
-not evidence.** Read the board back after every mutation.
-
-Meanwhile the read-only side worked throughout and is what the agent can rely
-on: `run_drc`, `pcb_visual_qa`, `pcb_score_placement`, `pcb_critique_placement`,
-`validate_footprints_vs_schematic`, renders and the STEP → STL case-fit loop.
+The dead connection never heals on its own. A plain Python client still opens
+the socket fine and `kicad_set_project()` does not re-establish it — only
+restarting the MCP server does, and the next write kills it again.
 
 ### Opening a project in KiCad 9 downgrades `.kicad_pro`
 
